@@ -49,7 +49,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
   try {
     const { name, description, startDate, endDate, status } = req.body;
     const cls = await prisma.class.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(name && { name }),
         ...(description !== undefined && { description }),
@@ -67,7 +67,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 // DELETE /api/classes/:id
 router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    await prisma.class.delete({ where: { id: req.params.id } });
+    await prisma.class.delete({ where: { id: req.params.id as string } });
     return res.json({ message: 'Turma excluída com sucesso' });
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao excluir turma' });
@@ -78,7 +78,7 @@ router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request,
 router.get('/:id/students', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const classStudents = await prisma.classStudent.findMany({
-      where: { classId: req.params.id },
+      where: { classId: req.params.id as string },
       include: {
         student: {
           include: {
@@ -89,7 +89,7 @@ router.get('/:id/students', authMiddleware, requireRole('ADMIN'), async (req: Re
       orderBy: { joinedAt: 'desc' }
     });
     
-    const students = classStudents.map(cs => ({
+    const students = classStudents.map((cs: any) => ({
       id: cs.student.id,
       name: cs.student.user.name,
       email: cs.student.user.email,
@@ -112,12 +112,12 @@ router.put('/:id/students', authMiddleware, requireRole('ADMIN'), async (req: Re
     }
 
     // Replace all associations
-    await prisma.classStudent.deleteMany({ where: { classId: req.params.id } });
+    await prisma.classStudent.deleteMany({ where: { classId: req.params.id as string } });
     
     if (studentIds.length > 0) {
       await prisma.classStudent.createMany({
         data: studentIds.map((studentId: string) => ({
-          classId: req.params.id,
+          classId: req.params.id as string,
           studentId
         }))
       });

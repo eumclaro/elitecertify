@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronUp,
   Search,
+  Send,
 } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
@@ -42,8 +43,9 @@ const adminLinks = [
   { path: '/admin/nps', label: 'NPS', icon: BarChart3 },
   { path: '/admin/reports', label: 'Relatórios', icon: ClipboardList },
   { path: '/admin/audit', label: 'Auditoria', icon: Lock },
-  { path: '/admin/smtp', label: 'SMTP', icon: Settings },
-  { path: '/admin/emails', label: 'E-mails', icon: Mail },
+  { path: '/admin/smtp', label: 'Settings', icon: Settings },
+  { path: '/admin/emails', label: 'E-mails Log', icon: Mail },
+  { path: '/admin/dispatches', label: 'Disparos', icon: Send },
 ];
 
 const studentLinks = [

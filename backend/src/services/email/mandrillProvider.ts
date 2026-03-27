@@ -23,9 +23,9 @@ export class MandrillProvider implements IEmailProvider {
       throw new Error('MandrillProvider is not initialized. Check MANDRILL_API_KEY.');
     }
 
-    const templateName = options.templateSlug || EMAIL_MAPPINGS[options.eventKey];
+    const templateName = options.templateSlug || (options.eventKey ? EMAIL_MAPPINGS[options.eventKey] : undefined);
     if (!templateName) {
-      throw new Error(`No Mandrill template mapped for event: ${options.eventKey}`);
+      throw new Error(`No Mandrill template mapped and no slug provided.`);
     }
 
     const globalMergeVars = Object.entries(options.dynamicData).map(([name, content]) => ({

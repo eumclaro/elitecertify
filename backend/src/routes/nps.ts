@@ -61,7 +61,7 @@ router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: Req
   try {
     const { title, classId, status } = req.body;
     const survey = await prisma.npsSurvey.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(title && { title }),
         ...(classId !== undefined && { classId: classId || null }),
@@ -77,7 +77,7 @@ router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: Req
 // DELETE /api/nps/surveys/:id
 router.delete('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    await prisma.npsSurvey.delete({ where: { id: req.params.id } });
+    await prisma.npsSurvey.delete({ where: { id: req.params.id as string } });
     return res.json({ message: 'Pesquisa excluída' });
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao excluir pesquisa' });
@@ -92,26 +92,26 @@ router.delete('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: 
 router.post('/surveys/:id/send', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const survey = await prisma.npsSurvey.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { class: { include: { students: true } } },
     });
 
     if (!survey) return res.status(404).json({ error: 'Pesquisa não encontrada' });
-    if (!survey.class) return res.status(400).json({ error: 'Pesquisa sem turma associada' });
+    if (!(survey as any).class) return res.status(400).json({ error: 'Pesquisa sem turma associada' });
 
-    const studentIds = survey.class.students.map(cs => cs.studentId);
+    const studentIds = (survey as any).class.students.map((cs: any) => cs.studentId);
     const existingInvites = await prisma.npsInvite.findMany({
       where: { surveyId: survey.id, studentId: { in: studentIds } },
     });
-    const existingStudentIds = existingInvites.map(i => i.studentId);
-    const newStudentIds = studentIds.filter(id => !existingStudentIds.includes(id));
+    const existingStudentIds = existingInvites.map((i: any) => i.studentId);
+    const newStudentIds = studentIds.filter((id: string) => !existingStudentIds.includes(id));
 
     if (newStudentIds.length === 0) {
       return res.json({ message: 'Todos os alunos já foram convidados', sent: 0 });
     }
 
     await prisma.npsInvite.createMany({
-      data: newStudentIds.map(studentId => ({
+      data: newStudentIds.map((studentId: string) => ({
         surveyId: survey.id,
         studentId,
         token: uuid(),
@@ -141,7 +141,7 @@ router.post('/surveys/:id/send', authMiddleware, requireRole('ADMIN'), async (re
 router.get('/respond/:token', async (req: Request, res: Response) => {
   try {
     const invite = await prisma.npsInvite.findUnique({
-      where: { token: req.params.token },
+      where: { token: req.params.token as string },
       include: {
         survey: { include: { questions: { orderBy: { order: 'asc' } } } },
         student: { include: { user: { select: { name: true } } } },
@@ -152,8 +152,8 @@ router.get('/respond/:token', async (req: Request, res: Response) => {
     if (invite.respondedAt) return res.status(400).json({ error: 'Pesquisa já respondida', alreadyResponded: true });
 
     return res.json({
-      survey: invite.survey,
-      studentName: invite.student.user.name,
+      survey: (invite as any).survey,
+      studentName: (invite as any).student.user.name,
       inviteId: invite.id,
     });
   } catch (error) {
@@ -166,7 +166,7 @@ router.post('/respond/:token', async (req: Request, res: Response) => {
   try {
     const { answers } = req.body; // [{ questionId, score?, text? }]
     const invite = await prisma.npsInvite.findUnique({
-      where: { token: req.params.token },
+      where: { token: req.params.token as string },
     });
 
     if (!invite) return res.status(404).json({ error: 'Link inválido' });
@@ -207,7 +207,7 @@ router.post('/respond/:token', async (req: Request, res: Response) => {
 router.get('/surveys/:id/results', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const survey = await prisma.npsSurvey.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         questions: { orderBy: { order: 'asc' } },
         invites: { include: { student: { include: { user: { select: { name: true, email: true } } } } } },
@@ -227,9 +227,9 @@ router.get('/surveys/:id/results', authMiddleware, requireRole('ADMIN'), async (
     let npsScore = null;
     let promoters = 0, detractors = 0, passives = 0;
 
-    if (scoreQuestions.length > 0 && survey.responses.length > 0) {
-      survey.responses.forEach(r => {
-        r.details.forEach(d => {
+    if (scoreQuestions.length > 0 && (survey as any).responses.length > 0) {
+      (survey as any).responses.forEach((r: any) => {
+        r.details.forEach((d: any) => {
           if (d.score !== null) {
             if (d.score >= 9) promoters++;
             else if (d.score <= 6) detractors++;
@@ -244,14 +244,14 @@ router.get('/surveys/:id/results', authMiddleware, requireRole('ADMIN'), async (
     return res.json({
       survey: { id: survey.id, title: survey.title, status: survey.status },
       stats: {
-        totalInvites: survey.invites.length,
-        totalResponses: survey.responses.length,
-        responseRate: survey.invites.length > 0 ? Math.round((survey.responses.length / survey.invites.length) * 100) : 0,
+        totalInvites: (survey as any).invites.length,
+        totalResponses: (survey as any).responses.length,
+        responseRate: (survey as any).invites.length > 0 ? Math.round(((survey as any).responses.length / (survey as any).invites.length) * 100) : 0,
         npsScore,
         promoters, passives, detractors,
       },
       questions: survey.questions,
-      responses: survey.responses.map(r => ({
+      responses: (survey as any).responses.map((r: any) => ({
         id: r.id,
         studentName: r.student.user.name,
         studentEmail: r.student.user.email,
@@ -271,7 +271,7 @@ router.get('/surveys/:id/results', authMiddleware, requireRole('ADMIN'), async (
 router.get('/surveys/:id/export', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const survey = await prisma.npsSurvey.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         questions: { orderBy: { order: 'asc' } },
         responses: {
@@ -286,16 +286,16 @@ router.get('/surveys/:id/export', authMiddleware, requireRole('ADMIN'), async (r
     if (!survey) return res.status(404).json({ error: 'Pesquisa não encontrada' });
 
     // Build CSV
-    const headers = ['Aluno', 'Email', ...survey.questions.map(q => q.text), 'Data'];
-    const rows = survey.responses.map(r => {
-      const answers = survey.questions.map(q => {
-        const detail = r.details.find(d => d.questionId === q.id);
+    const headers = ['Aluno', 'Email', ...(survey as any).questions.map((q: any) => q.text), 'Data'];
+    const rows = (survey as any).responses.map((r: any) => {
+      const answers = (survey as any).questions.map((q: any) => {
+        const detail = r.details.find((d: any) => d.questionId === q.id);
         return detail?.score?.toString() || detail?.text || '';
       });
       return [r.student.user.name, r.student.user.email, ...answers, r.createdAt.toISOString()];
     });
 
-    const csv = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const csv = [headers.join(';'), ...rows.map((r: any) => r.join(';'))].join('\n');
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="nps-${survey.id}.csv"`);

@@ -52,7 +52,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface Student {
   id: string;
@@ -104,7 +104,6 @@ export default function Students() {
 
   // Cooldowns Modal
   const [showCooldownsModal, setShowCooldownsModal] = useState(false);
-  const [activeStudent, setActiveStudent] = useState<Student | null>(null);
   const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
   
   // States for confirmation dialogs (using Shadcn Dialog)
@@ -121,6 +120,7 @@ export default function Students() {
 
   // Form state
   const [form, setForm] = useState({ name: '', lastName: '', email: '', password: '', cpf: '', phone: '' });
+  const [isSaving, setIsSaving] = useState(false);
 
   const loadStudents = async (page = 1) => {
     setLoading(true);
@@ -136,9 +136,17 @@ export default function Students() {
     try { const res = await api.get('/classes'); setClasses(res.data); } catch {}
   };
 
-  useEffect(() => { loadStudents(); loadClasses(); }, []);
+  useEffect(() => { loadClasses(); }, []);
 
-  const handleSearch = () => loadStudents(1);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      // Don't search on initial empty load if we already loaded in the class effect? 
+      // Actually, loading on mount is good.
+      loadStudents(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
 
   const openCreate = () => {
     setEditing(null);
@@ -186,7 +194,6 @@ export default function Students() {
   };
 
   const openCooldowns = async (student: Student) => {
-    setActiveStudent(student);
     setShowCooldownsModal(true);
     try {
       const res = await api.get(`/students/${student.id}/cooldowns`);
@@ -201,11 +208,26 @@ export default function Students() {
     setActionLoading(true);
     try {
       await api.put(`/exams/cooldowns/${confirmCooldown.id}/clear`);
-      if (activeStudent) openCooldowns(activeStudent);
+      
+      // Update local state for immediate UI feedback in the Cooldown Tab
+      setStudents(prev => prev.map(s => {
+        const studentId = (confirmCooldown as any).student?.id || (confirmCooldown as any).studentId;
+        if (s.id === studentId) {
+          return {
+            ...s,
+            cooldowns: s.cooldowns?.filter((c: any) => c.id !== confirmCooldown.id)
+          };
+        }
+        return s;
+      }));
+
+      // Update local state for the modal (if open)
+      setCooldowns(prev => prev.filter(c => c.id !== confirmCooldown.id));
+
       setConfirmCooldown(null);
-      toast.success("Liberado com sucesso!");
+      toast.success("Cooldown liberado com sucesso");
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Erro ao liberar cooldown');
+      toast.error("Erro ao liberar cooldown. Tente novamente");
     } finally {
       setActionLoading(false);
     }
@@ -213,21 +235,25 @@ export default function Students() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     try {
       if (editing) {
         await api.put(`/students/${editing.id}`, {
           name: form.name, lastName: form.lastName, email: form.email, cpf: form.cpf || null, phone: form.phone || null,
         });
+        toast.success("Alterações salvas com sucesso");
       } else {
         await api.post('/students', {
           name: form.name, lastName: form.lastName, email: form.email, password: form.password, cpf: form.cpf || null, phone: form.phone || null,
         });
+        toast.success("Aluno criado com sucesso");
       }
       setShowModal(false);
       loadStudents(pagination.page);
-      toast.success(`Aluno ${editing ? 'atualizado' : 'criado'} com sucesso!`);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Erro ao salvar aluno');
+      toast.error("Erro ao salvar. Tente novamente");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -279,31 +305,26 @@ export default function Students() {
       </div>
 
       <Tabs defaultValue="alunos" className="w-full">
-        <TabsList className="bg-muted/50 p-1 mb-4 h-11">
-          <TabsTrigger value="alunos" className="px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm">Alunos</TabsTrigger>
-          <TabsTrigger value="cooldown" className="px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm">Cooldown</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <TabsList className="bg-muted/50 p-1 h-11 w-full md:w-auto">
+            <TabsTrigger value="alunos" className="px-8 data-[state=active]:bg-background data-[state=active]:shadow-sm">Alunos</TabsTrigger>
+            <TabsTrigger value="cooldown" className="px-8 data-[state=active]:bg-background data-[state=active]:shadow-sm">Cooldown</TabsTrigger>
+          </TabsList>
+
+          <div className="relative w-full md:max-w-md group">
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground/70 group-focus-within:text-primary transition-colors" />
+            <Input
+              placeholder="Buscar por nome ou email..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              autoComplete="off"
+              className="pl-11 h-11 bg-background border-2 border-muted hover:border-muted-foreground/20 focus-visible:border-primary focus-visible:ring-primary/20 transition-all rounded-xl shadow-sm"
+            />
+          </div>
+        </div>
 
         <TabsContent value="alunos" className="space-y-4 outline-none">
           <Card className="border-none shadow-sm">
-            <CardHeader className="pb-3 px-6">
-              <div className="flex items-center gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-50" />
-                  <Input
-                    placeholder="Buscar por nome ou email..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                    className="pl-10 h-10 bg-muted/40 border-none"
-                  />
-                </div>
-                <Button variant="secondary" onClick={handleSearch} className="h-10 px-6 font-semibold">
-                  <Search className="mr-2 h-4 w-4" />
-                  Filtrar
-                </Button>
-              </div>
-            </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader className="bg-muted/30">
@@ -505,8 +526,11 @@ export default function Students() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>Cancelar</Button>
-              <Button type="submit">{editing ? 'Salvar Alterações' : 'Criar Aluno'}</Button>
+              <Button type="button" variant="ghost" onClick={() => setShowModal(false)} disabled={isSaving}>Cancelar</Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSaving ? (editing ? 'Salvando...' : 'Criando...') : (editing ? 'Salvar Alterações' : 'Criar Aluno')}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -523,7 +547,7 @@ export default function Students() {
               <div className="grid grid-cols-2 gap-y-4">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase">Nome</p>
-                  <p className="text-sm font-semibold">{activeDataStudent.user.name}</p>
+                  <p className="text-sm font-semibold">{activeDataStudent.user.name} {activeDataStudent.lastName}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase">Email</p>
@@ -785,8 +809,11 @@ export default function Students() {
             <DialogDescription>O tempo de espera será zerado para este aluno.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => setConfirmCooldown(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={executeClearCooldown} disabled={actionLoading}>Confirmar Liberação</Button>
+            <Button variant="ghost" onClick={() => setConfirmCooldown(null)} disabled={actionLoading}>Cancelar</Button>
+            <Button variant="destructive" onClick={executeClearCooldown} disabled={actionLoading}>
+              {actionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {actionLoading ? 'Liberando...' : 'Confirmar Liberação'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

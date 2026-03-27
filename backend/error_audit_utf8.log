@@ -1,0 +1,133 @@
+﻿
+> elt-cert-backend@1.0.0 build
+> tsc
+
+src/middleware/audit.ts(12,11): error TS2322: Type 'string | string[] | null' is not assignable to type 'string | null | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/classes.ts(52,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/classes.ts(70,42): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/classes.ts(81,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"ClassStudent"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"ClassStudent"> | undefined'.
+src/routes/classes.ts(93,14): error TS2551: Property 'student' does not exist on type '{ id: string; classId: string; studentId: string; joinedAt: Date; }'. Did you mean 'studentId'?
+src/routes/classes.ts(94,16): error TS2551: Property 'student' does not exist on type '{ id: string; classId: string; studentId: string; joinedAt: Date; }'. Did you mean 'studentId'?
+src/routes/classes.ts(95,17): error TS2551: Property 'student' does not exist on type '{ id: string; classId: string; studentId: string; joinedAt: Date; }'. Did you mean 'studentId'?
+src/routes/classes.ts(115,53): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"ClassStudent"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"ClassStudent"> | undefined'.
+src/routes/classes.ts(119,9): error TS2322: Type '{ classId: string | string[]; studentId: string; }[]' is not assignable to type 'ClassStudentCreateManyInput | ClassStudentCreateManyInput[]'.
+  Type '{ classId: string | string[]; studentId: string; }[]' is not assignable to type 'ClassStudentCreateManyInput[]'.
+    Type '{ classId: string | string[]; studentId: string; }' is not assignable to type 'ClassStudentCreateManyInput'.
+      Types of property 'classId' are incompatible.
+        Type 'string | string[]' is not assignable to type 'string'.
+          Type 'string[]' is not assignable to type 'string'.
+src/routes/nps.ts(64,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/nps.ts(80,46): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/nps.ts(95,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/nps.ts(100,17): error TS2551: Property 'class' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'. Did you mean 'classId'?
+src/routes/nps.ts(102,31): error TS2551: Property 'class' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'. Did you mean 'classId'?
+src/routes/nps.ts(102,50): error TS7006: Parameter 'cs' implicitly has an 'any' type.
+src/routes/nps.ts(107,45): error TS7006: Parameter 'id' implicitly has an 'any' type.
+src/routes/nps.ts(114,31): error TS7006: Parameter 'studentId' implicitly has an 'any' type.
+src/routes/nps.ts(144,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/nps.ts(155,22): error TS2551: Property 'survey' does not exist on type '{ id: string; createdAt: Date; status: NpsInviteStatus; token: string; studentId: string; surveyId: string; respondedAt: Date | null; }'. Did you mean 'surveyId'?
+src/routes/nps.ts(156,27): error TS2551: Property 'student' does not exist on type '{ id: string; createdAt: Date; status: NpsInviteStatus; token: string; studentId: string; surveyId: string; respondedAt: Date | null; }'. Did you mean 'studentId'?
+src/routes/nps.ts(169,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/nps.ts(210,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/nps.ts(226,35): error TS2339: Property 'questions' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(226,52): error TS7006: Parameter 'q' implicitly has an 'any' type.
+src/routes/nps.ts(230,45): error TS2339: Property 'responses' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(231,14): error TS2339: Property 'responses' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(231,32): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/routes/nps.ts(232,27): error TS7006: Parameter 'd' implicitly has an 'any' type.
+src/routes/nps.ts(247,30): error TS2339: Property 'invites' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(248,32): error TS2339: Property 'responses' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(249,30): error TS2339: Property 'invites' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(249,70): error TS2339: Property 'responses' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(249,96): error TS2339: Property 'invites' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(253,25): error TS2339: Property 'questions' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(254,25): error TS2339: Property 'responses' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(254,39): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/routes/nps.ts(274,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/nps.ts(289,50): error TS2339: Property 'questions' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(289,64): error TS7006: Parameter 'q' implicitly has an 'any' type.
+src/routes/nps.ts(290,25): error TS2339: Property 'responses' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(290,39): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/routes/nps.ts(291,30): error TS2339: Property 'questions' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: NpsStatus; title: string; classId: string | null; createdBy: string; }'.
+src/routes/nps.ts(291,44): error TS7006: Parameter 'q' implicitly has an 'any' type.
+src/routes/nps.ts(292,39): error TS7006: Parameter 'd' implicitly has an 'any' type.
+src/routes/nps.ts(298,49): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/routes/questions.ts(17,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Question"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Question"> | undefined'.
+src/routes/questions.ts(27,11): error TS2339: Property 'alternatives' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; text: string; examId: string; order: number; type: QuestionType; }'.
+src/routes/questions.ts(27,32): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/routes/questions.ts(44,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/questions.ts(69,58): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/questions.ts(156,20): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Question"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Question"> | undefined'.
+src/routes/questions.ts(166,17): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/questions.ts(220,18): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Question"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Question"> | undefined'.
+src/routes/questions.ts(228,9): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/questions.ts(257,66): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/questions.ts(264,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/questions.ts(274,54): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Alternative"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Alternative"> | undefined'.
+src/routes/questions.ts(276,54): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Alternative"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Alternative"> | undefined'.
+src/routes/questions.ts(288,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/questions.ts(302,66): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/questions.ts(307,45): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/reports.ts(15,9): error TS2353: Object literal may only specify known properties, and 'class' does not exist in type 'ExamInclude<DefaultArgs>'.
+src/routes/reports.ts(23,35): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'ExamAttemptWhereInput'.
+src/routes/reports.ts(26,45): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; ip: string | null; device: string | null; finishedAt: Date | null; studentId: string; examId: string; startedAt: Date; score: number | null; executionStatus: AttemptExecutionStatus; resultStatus: AttemptResultStatus; }'.
+src/routes/reports.ts(27,45): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; ip: string | null; device: string | null; finishedAt: Date | null; studentId: string; examId: string; startedAt: Date; score: number | null; executionStatus: AttemptExecutionStatus; resultStatus: AttemptResultStatus; }'.
+src/routes/reports.ts(28,48): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; ip: string | null; device: string | null; finishedAt: Date | null; studentId: string; examId: string; startedAt: Date; score: number | null; executionStatus: AttemptExecutionStatus; resultStatus: AttemptResultStatus; }'.
+src/routes/reports.ts(36,25): error TS2339: Property 'class' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: ExamStatus; description: string | null; title: string; questionCount: number; durationMinutes: number; passingScore: number; maxAttempts: number; cooldownDays: number; questionOrder: QuestionOrder; }'.
+src/routes/reports.ts(38,29): error TS2339: Property '_count' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: ExamStatus; description: string | null; title: string; questionCount: number; durationMinutes: number; passingScore: number; maxAttempts: number; cooldownDays: number; questionOrder: QuestionOrder; }'.
+src/routes/reports.ts(43,28): error TS2339: Property '_count' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: ExamStatus; description: string | null; title: string; questionCount: number; durationMinutes: number; passingScore: number; maxAttempts: number; cooldownDays: number; questionOrder: QuestionOrder; }'.
+src/routes/reports.ts(67,29): error TS2353: Object literal may only specify known properties, and 'attempts' does not exist in type 'StudentCountOutputTypeSelect<DefaultArgs>'.
+src/routes/reports.ts(74,35): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'ExamAttemptWhereInput'.
+src/routes/reports.ts(76,45): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; ip: string | null; device: string | null; finishedAt: Date | null; studentId: string; examId: string; startedAt: Date; score: number | null; executionStatus: AttemptExecutionStatus; resultStatus: AttemptResultStatus; }'.
+src/routes/reports.ts(83,17): error TS2339: Property 'user' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; cpf: string | null; phone: string | null; enrollmentDate: Date; status: string; lastName: string | null; userId: string; }'.
+src/routes/reports.ts(84,18): error TS2339: Property 'user' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; cpf: string | null; phone: string | null; enrollmentDate: Date; status: string; lastName: string | null; userId: string; }'.
+src/routes/reports.ts(85,20): error TS2339: Property 'classes' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; cpf: string | null; phone: string | null; enrollmentDate: Date; status: string; lastName: string | null; userId: string; }'.
+src/routes/reports.ts(85,32): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/routes/reports.ts(88,40): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; ip: string | null; device: string | null; finishedAt: Date | null; studentId: string; examId: string; startedAt: Date; score: number | null; executionStatus: AttemptExecutionStatus; resultStatus: AttemptResultStatus; }'.
+src/routes/reports.ts(90,25): error TS2339: Property '_count' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; cpf: string | null; phone: string | null; enrollmentDate: Date; status: string; lastName: string | null; userId: string; }'.
+src/routes/reports.ts(111,43): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'ExamAttemptWhereInput'.
+src/routes/reports.ts(116,70): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'ExamAttemptWhereInput'.
+src/routes/reports.ts(117,70): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'ExamAttemptWhereInput'.
+src/routes/reports.ts(122,16): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'ExamAttemptWhereInput'.
+src/routes/reports.ts(152,9): error TS2353: Object literal may only specify known properties, and 'class' does not exist in type 'ExamInclude<DefaultArgs>'.
+src/routes/reports.ts(159,35): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'ExamAttemptWhereInput'.
+src/routes/reports.ts(161,45): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; ip: string | null; device: string | null; finishedAt: Date | null; studentId: string; examId: string; startedAt: Date; score: number | null; executionStatus: AttemptExecutionStatus; resultStatus: AttemptResultStatus; }'.
+src/routes/reports.ts(168,14): error TS2339: Property 'class' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: ExamStatus; description: string | null; title: string; questionCount: number; durationMinutes: number; passingScore: number; maxAttempts: number; cooldownDays: number; questionOrder: QuestionOrder; }'.
+src/routes/reports.ts(170,14): error TS2339: Property '_count' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: ExamStatus; description: string | null; title: string; questionCount: number; durationMinutes: number; passingScore: number; maxAttempts: number; cooldownDays: number; questionOrder: QuestionOrder; }'.
+src/routes/reports.ts(173,32): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; ip: string | null; device: string | null; finishedAt: Date | null; studentId: string; examId: string; startedAt: Date; score: number | null; executionStatus: AttemptExecutionStatus; resultStatus: AttemptResultStatus; }'.
+src/routes/reports.ts(175,14): error TS2339: Property '_count' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; status: ExamStatus; description: string | null; title: string; questionCount: number; durationMinutes: number; passingScore: number; maxAttempts: number; cooldownDays: number; questionOrder: QuestionOrder; }'.
+src/routes/reports.ts(201,29): error TS2353: Object literal may only specify known properties, and 'attempts' does not exist in type 'StudentCountOutputTypeSelect<DefaultArgs>'.
+src/routes/reports.ts(207,35): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'ExamAttemptWhereInput'.
+src/routes/reports.ts(209,45): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; ip: string | null; device: string | null; finishedAt: Date | null; studentId: string; examId: string; startedAt: Date; score: number | null; executionStatus: AttemptExecutionStatus; resultStatus: AttemptResultStatus; }'.
+src/routes/reports.ts(215,11): error TS2339: Property 'user' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; cpf: string | null; phone: string | null; enrollmentDate: Date; status: string; lastName: string | null; userId: string; }'.
+src/routes/reports.ts(216,11): error TS2339: Property 'user' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; cpf: string | null; phone: string | null; enrollmentDate: Date; status: string; lastName: string | null; userId: string; }'.
+src/routes/reports.ts(217,11): error TS2339: Property 'classes' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; cpf: string | null; phone: string | null; enrollmentDate: Date; status: string; lastName: string | null; userId: string; }'.
+src/routes/reports.ts(217,23): error TS7006: Parameter 'c' implicitly has an 'any' type.
+src/routes/reports.ts(220,32): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; ip: string | null; device: string | null; finishedAt: Date | null; studentId: string; examId: string; startedAt: Date; score: number | null; executionStatus: AttemptExecutionStatus; resultStatus: AttemptResultStatus; }'.
+src/routes/reports.ts(222,11): error TS2339: Property '_count' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; cpf: string | null; phone: string | null; enrollmentDate: Date; status: string; lastName: string | null; userId: string; }'.

@@ -15,6 +15,7 @@ import auditRoutes from './routes/audit';
 import settingsRoutes from './routes/settings';
 import webhooksRoutes from './routes/webhooks';
 import emailTemplatesRoutes from './routes/emailTemplates';
+import dispatchRoutes from './routes/dispatches';
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/webhooks', webhooksRoutes);
 app.use('/api/email-templates', emailTemplatesRoutes);
+app.use('/api/dispatches', dispatchRoutes);
 
 // 404
 app.use((_req, res) => {

@@ -16,6 +16,7 @@ import Reports from './pages/admin/Reports';
 import AuditLogs from './pages/admin/AuditLogs';
 import SmtpSettings from './pages/admin/SmtpSettings';
 import EmailManagement from './pages/admin/EmailManagement';
+import Dispatches from './pages/admin/Dispatches';
 import StudentExams from './pages/student/StudentExams';
 import TakeExam from './pages/student/TakeExam';
 import ExamResult from './pages/student/ExamResult';
@@ -51,6 +52,7 @@ function AppRoutes() {
       <Route path="/admin/audit" element={<ProtectedRoute adminOnly><Layout><AuditLogs /></Layout></ProtectedRoute>} />
       <Route path="/admin/smtp" element={<ProtectedRoute adminOnly><Layout><SmtpSettings /></Layout></ProtectedRoute>} />
       <Route path="/admin/emails" element={<ProtectedRoute adminOnly><Layout><EmailManagement /></Layout></ProtectedRoute>} />
+      <Route path="/admin/dispatches" element={<ProtectedRoute adminOnly><Layout><Dispatches /></Layout></ProtectedRoute>} />
 
       {/* Student Routes */}
       <Route path="/student/exams" element={<ProtectedRoute><Layout><StudentExams /></Layout></ProtectedRoute>} />

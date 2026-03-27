@@ -12,28 +12,28 @@ router.get('/exams', authMiddleware, requireRole('ADMIN'), async (req: Request, 
   try {
     const exams = await prisma.exam.findMany({
       include: {
-        class: { select: { name: true } },
         _count: { select: { questions: true, attempts: true, certificates: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    const report = await Promise.all(exams.map(async (exam) => {
+    const report = await Promise.all(exams.map(async (exam: any) => {
       const attempts = await prisma.examAttempt.findMany({
-        where: { examId: exam.id, status: { not: 'IN_PROGRESS' } },
+        where: { examId: exam.id, executionStatus: 'FINISHED' },
       });
 
-      const passed = attempts.filter(a => a.status === 'PASSED').length;
-      const failed = attempts.filter(a => a.status === 'FAILED').length;
-      const abandoned = attempts.filter(a => a.status === 'ABANDONED').length;
+      const passed = attempts.filter((a: any) => a.resultStatus === 'PASSED').length;
+      const failed = attempts.filter((a: any) => a.resultStatus === 'FAILED').length;
+      const abandoned = await prisma.examAttempt.count({
+        where: { examId: exam.id, executionStatus: 'ABANDONED' }
+      });
       const avgScore = attempts.length > 0
-        ? Math.round(attempts.reduce((sum, a) => sum + (a.score || 0), 0) / attempts.length)
+        ? Math.round(attempts.reduce((sum: number, a: any) => sum + (a.score || 0), 0) / attempts.length)
         : 0;
 
       return {
         id: exam.id,
         title: exam.title,
-        className: exam.class?.name || 'Sem turma',
         status: exam.status,
         questionCount: exam._count.questions,
         totalAttempts: attempts.length,
@@ -64,28 +64,28 @@ router.get('/students', authMiddleware, requireRole('ADMIN'), async (req: Reques
       include: {
         user: { select: { name: true, email: true } },
         classes: { include: { class: { select: { name: true } } } },
-        _count: { select: { attempts: true, certificates: true } },
+        _count: { select: { attempts: true, certificates: true } } as any,
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    const report = await Promise.all(students.map(async (s) => {
+    const report = await Promise.all(students.map(async (s: any) => {
       const attempts = await prisma.examAttempt.findMany({
-        where: { studentId: s.id, status: { not: 'IN_PROGRESS' } },
+        where: { studentId: s.id, executionStatus: 'FINISHED' },
       });
-      const passed = attempts.filter(a => a.status === 'PASSED').length;
+      const passed = attempts.filter((a: any) => a.resultStatus === 'PASSED').length;
       const avgScore = attempts.length > 0
-        ? Math.round(attempts.reduce((sum, a) => sum + (a.score || 0), 0) / attempts.length)
+        ? Math.round(attempts.reduce((sum: number, a: any) => sum + (a.score || 0), 0) / attempts.length)
         : 0;
 
       return {
         id: s.id,
         name: s.user.name,
         email: s.user.email,
-        classes: s.classes.map(c => c.class.name).join(', ') || 'Nenhuma',
+        classes: s.classes.map((c: any) => c.class.name).join(', ') || 'Nenhuma',
         totalAttempts: attempts.length,
         passed,
-        failed: attempts.filter(a => a.status === 'FAILED').length,
+        failed: attempts.filter((a: any) => a.resultStatus === 'FAILED').length,
         avgScore,
         certificates: s._count.certificates,
         createdAt: s.createdAt,
@@ -108,22 +108,22 @@ router.get('/stats', authMiddleware, requireRole('ADMIN'), async (req: Request, 
     const [totalStudents, totalExams, totalAttempts, totalCertificates, totalClasses] = await Promise.all([
       prisma.student.count(),
       prisma.exam.count(),
-      prisma.examAttempt.count({ where: { status: { not: 'IN_PROGRESS' } } }),
+      prisma.examAttempt.count({ where: { executionStatus: 'FINISHED' } }),
       prisma.certificate.count(),
       prisma.class.count(),
     ]);
 
-    const passedAttempts = await prisma.examAttempt.count({ where: { status: 'PASSED' } });
-    const failedAttempts = await prisma.examAttempt.count({ where: { status: 'FAILED' } });
+    const passedAttempts = await prisma.examAttempt.count({ where: { resultStatus: 'PASSED' } });
+    const failedAttempts = await prisma.examAttempt.count({ where: { resultStatus: 'FAILED' } });
     const globalPassRate = totalAttempts > 0 ? Math.round((passedAttempts / totalAttempts) * 100) : 0;
 
     // Average score
     const allAttempts = await prisma.examAttempt.findMany({
-      where: { status: { not: 'IN_PROGRESS' } },
+      where: { executionStatus: 'FINISHED' },
       select: { score: true },
     });
     const avgScore = allAttempts.length > 0
-      ? Math.round(allAttempts.reduce((sum, a) => sum + (a.score || 0), 0) / allAttempts.length)
+      ? Math.round(allAttempts.reduce((sum: number, a: any) => sum + (a.score || 0), 0) / allAttempts.length)
       : 0;
 
     // NPS stats
@@ -149,35 +149,33 @@ router.get('/exams/export', authMiddleware, requireRole('ADMIN'), async (req: Re
   try {
     const exams = await prisma.exam.findMany({
       include: {
-        class: { select: { name: true } },
         _count: { select: { questions: true, attempts: true, certificates: true } },
       },
     });
 
-    const rows = await Promise.all(exams.map(async (exam) => {
+    const rows = await Promise.all(exams.map(async (exam: any) => {
       const attempts = await prisma.examAttempt.findMany({
-        where: { examId: exam.id, status: { not: 'IN_PROGRESS' } },
+        where: { examId: exam.id, executionStatus: 'FINISHED' },
       });
-      const passed = attempts.filter(a => a.status === 'PASSED').length;
+      const passed = attempts.filter((a: any) => a.resultStatus === 'PASSED').length;
       const avgScore = attempts.length > 0
-        ? Math.round(attempts.reduce((sum, a) => sum + (a.score || 0), 0) / attempts.length)
+        ? Math.round(attempts.reduce((sum: number, a: any) => sum + (a.score || 0), 0) / attempts.length)
         : 0;
 
       return [
         exam.title,
-        exam.class?.name || 'Sem turma',
         exam.status,
         exam._count.questions,
         attempts.length,
         passed,
-        attempts.filter(a => a.status === 'FAILED').length,
+        attempts.filter((a: any) => a.resultStatus === 'FAILED').length,
         avgScore + '%',
         exam._count.certificates,
         exam.createdAt.toISOString().split('T')[0],
       ].join(';');
     }));
 
-    const headers = 'Prova;Turma;Status;Questões;Tentativas;Aprovados;Reprovados;Média;Certificados;Criação';
+    const headers = 'Prova;Status;Questões;Tentativas;Aprovados;Reprovados;Média;Certificados;Criação';
     const csv = [headers, ...rows].join('\n');
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -198,28 +196,28 @@ router.get('/students/export', authMiddleware, requireRole('ADMIN'), async (req:
       include: {
         user: { select: { name: true, email: true } },
         classes: { include: { class: { select: { name: true } } } },
-        _count: { select: { attempts: true, certificates: true } },
+        _count: { select: { attempts: true, certificates: true } } as any,
       },
     });
 
-    const rows = await Promise.all(students.map(async (s) => {
+    const rows = await Promise.all(students.map(async (s: any) => {
       const attempts = await prisma.examAttempt.findMany({
-        where: { studentId: s.id, status: { not: 'IN_PROGRESS' } },
+        where: { studentId: s.id, executionStatus: 'FINISHED' },
       });
-      const passed = attempts.filter(a => a.status === 'PASSED').length;
+      const passed = attempts.filter((a: any) => a.resultStatus === 'PASSED').length;
       const avgScore = attempts.length > 0
-        ? Math.round(attempts.reduce((sum, a) => sum + (a.score || 0), 0) / attempts.length)
+        ? Math.round(attempts.reduce((sum: number, a: any) => sum + (a.score || 0), 0) / attempts.length)
         : 0;
 
       return [
         s.user.name,
         s.user.email,
-        s.classes.map(c => c.class.name).join(', ') || 'Nenhuma',
+        s.classes.map((c: any) => c.class.name).join(', ') || 'Nenhuma',
         attempts.length,
         passed,
-        attempts.filter(a => a.status === 'FAILED').length,
+        attempts.filter((a: any) => a.resultStatus === 'FAILED').length,
         avgScore + '%',
-        s._count.certificates,
+        (s as any)._count.certificates,
         s.createdAt.toISOString().split('T')[0],
       ].join(';');
     }));

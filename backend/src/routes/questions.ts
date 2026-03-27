@@ -14,7 +14,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     const { examId } = req.params;
 
     const questions = await prisma.question.findMany({
-      where: { examId },
+      where: { examId: examId as string },
       include: {
         alternatives: { orderBy: { order: 'asc' } },
       },
@@ -23,8 +23,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     // If student, hide correct answers
     if (req.user?.role === 'STUDENT') {
-      questions.forEach(q => {
-        q.alternatives.forEach(a => {
+      questions.forEach((q: any) => {
+        q.alternatives.forEach((a: any) => {
           (a as any).isCorrect = undefined;
         });
       });
@@ -41,13 +41,13 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
     const question = await prisma.question.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         alternatives: { orderBy: { order: 'asc' } },
       },
     });
 
-    if (!question || question.examId !== req.params.examId) {
+    if (!question || (question as any).examId !== req.params.examId) {
       return res.status(404).json({ error: 'Questão não encontrada' });
     }
 
@@ -66,7 +66,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), upload.single('file
     const results: any[] = [];
     const errors: string[] = [];
     
-    const exam = await prisma.exam.findUnique({ where: { id: examId } });
+    const exam = await prisma.exam.findUnique({ where: { id: examId as string } });
     if (!exam) return res.status(404).json({ error: 'Prova não encontrada' });
 
     let bufferString = req.file.buffer.toString('utf-8');
@@ -153,7 +153,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), upload.single('file
         }
 
         const lastQuestion = await prisma.question.findFirst({
-          where: { examId },
+          where: { examId: examId as string },
           orderBy: { order: 'desc' },
         });
         let currentOrder = (lastQuestion?.order || 0);
@@ -163,7 +163,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), upload.single('file
             currentOrder++;
             return prisma.question.create({
               data: {
-                examId,
+                examId: examId as string,
                 text: q.text,
                 type: q.type,
                 order: currentOrder,
@@ -217,7 +217,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
     let questionOrder = order;
     if (questionOrder === undefined) {
       const lastQuestion = await prisma.question.findFirst({
-        where: { examId },
+        where: { examId: examId as string },
         orderBy: { order: 'desc' },
       });
       questionOrder = (lastQuestion?.order || 0) + 1;
@@ -225,7 +225,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 
     const question = await prisma.question.create({
       data: {
-        examId,
+        examId: examId as string,
         text,
         type: type || 'SINGLE_CHOICE',
         order: questionOrder,
@@ -252,16 +252,17 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 // PUT /api/exams/:examId/questions/:id — Update question
 router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
+    const { examId } = req.params;
     const { text, type, order, alternatives } = req.body;
 
-    const existing = await prisma.question.findUnique({ where: { id: req.params.id } });
-    if (!existing || existing.examId !== req.params.examId) {
+    const existing = await prisma.question.findUnique({ where: { id: req.params.id as string } });
+    if (!existing || existing.examId !== examId) {
       return res.status(404).json({ error: 'Questão não encontrada' });
     }
 
     // Update question
     const question = await prisma.question.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(text !== undefined && { text }),
         ...(type !== undefined && { type }),
@@ -271,12 +272,12 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 
     // If alternatives provided, replace all
     if (type === 'ESSAY') {
-      await prisma.alternative.deleteMany({ where: { questionId: req.params.id } });
+      await prisma.alternative.deleteMany({ where: { questionId: req.params.id as string } });
     } else if (alternatives && alternatives.length > 0) {
-      await prisma.alternative.deleteMany({ where: { questionId: req.params.id } });
+      await prisma.alternative.deleteMany({ where: { questionId: req.params.id as string } });
       await prisma.alternative.createMany({
         data: alternatives.map((alt: any, index: number) => ({
-          questionId: req.params.id,
+          questionId: req.params.id as string,
           text: alt.text,
           isCorrect: alt.isCorrect || false,
           order: alt.order ?? index + 1,
@@ -285,7 +286,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
     }
 
     const updated = await prisma.question.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { alternatives: { orderBy: { order: 'asc' } } },
     });
 
@@ -299,12 +300,13 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 // DELETE /api/exams/:examId/questions/:id — Delete question
 router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const existing = await prisma.question.findUnique({ where: { id: req.params.id } });
-    if (!existing || existing.examId !== req.params.examId) {
+    const { examId } = req.params;
+    const existing = await prisma.question.findUnique({ where: { id: req.params.id as string } });
+    if (!existing || existing.examId !== examId) {
       return res.status(404).json({ error: 'Questão não encontrada' });
     }
 
-    await prisma.question.delete({ where: { id: req.params.id } });
+    await prisma.question.delete({ where: { id: req.params.id as string } });
     return res.json({ message: 'Questão excluída com sucesso' });
   } catch (error) {
     console.error('Delete question error:', error);
@@ -324,8 +326,8 @@ router.post('/reorder', authMiddleware, requireRole('ADMIN'), async (req: Reques
     await Promise.all(
       orders.map((item: { id: string; order: number }) =>
         prisma.question.update({
-          where: { id: item.id },
-          data: { order: item.order },
+          where: { id: item.id as string },
+          data: { order: item.order as number },
         })
       )
     );

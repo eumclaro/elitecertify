@@ -3,7 +3,7 @@ import { EmailEventKey } from '../../constants/emailEvents';
 export interface SendTemplateOptions {
   toEmail: string;
   toName: string;
-  eventKey: EmailEventKey;
+  eventKey?: EmailEventKey;
   templateSlug?: string;
   subject?: string;
   dynamicData: Record<string, any>;

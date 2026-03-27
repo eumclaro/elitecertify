@@ -6,12 +6,12 @@ export async function auditMiddleware(action: string, entity: string) {
     try {
       await prisma.auditEvent.create({
         data: {
-          userId: req.user?.userId || null,
+          userId: (req as any).user?.userId || null,
           action,
           entity,
-          entityId: req.params.id || null,
+          entityId: (req.params.id as any) || null,
           ip: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || null,
-          device: req.headers['user-agent'] || null,
+          device: (req.headers['user-agent'] as string) || null,
           metadata: JSON.stringify({ method: req.method, path: req.path }),
         },
       });

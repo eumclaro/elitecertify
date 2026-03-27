@@ -35,11 +35,11 @@ model Student {
   userId         String         @unique @map("user_id")
   cpf            String?        @unique
   phone          String?
-  lastName       String?        @map("last_name")
   enrollmentDate DateTime       @default(now()) @map("enrollment_date")
   status         String         @default("ACTIVE")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
+  lastName       String?        @map("last_name")
   certificates   Certificate[]
   classes        ClassStudent[]
   cooldowns      Cooldown[]
@@ -360,6 +360,19 @@ model EmailEventBinding {
   template           EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@map("email_event_bindings")
+}
+
+
+model Dispatch {
+  id           String   @id @default(uuid())
+  templateSlug String   @map("template_slug")
+  recipientGroup String? @map("recipient_group")
+  totalSent    Int      @default(0) @map("total_sent")
+  totalFailed  Int      @default(0) @map("total_failed")
+  failedEmails Json?    @map("failed_emails") // Array of objects { email, error }
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("dispatches")
 }
 
 model SystemSetting {

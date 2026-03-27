@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import path from 'path';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { getEmailProvider, getAuthorizedSender, dispatchTemplateToMandrill } from '../services/mail';
@@ -302,39 +303,125 @@ router.get('/:id/export', authMiddleware, requireRole('ADMIN'), async (req: Requ
     }
 
     if (format === 'pdf') {
-      // Lazy-load pdfkit para evitar crashes se não instalado em runtime inicial
       const PDFDocument = require('pdfkit');
-      const doc = new PDFDocument({ margin: 50 });
+      // Buffer pages to allow post-generation footer addition
+      const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=dispatch-report-${id}.pdf`);
       doc.pipe(res);
 
-      // Cabeçalho
+      // 1. CABEÇALHO (LOGO + TÍTULOS)
+      const logoPath = path.resolve(__dirname, '../../../frontend/public/logotipo-elite-training.png');
+      try {
+        doc.image(logoPath, 50, 45, { height: 40 });
+      } catch (e) {
+        console.warn('Logo not found at:', logoPath);
+      }
+
+      doc.fillColor('#1a1a1a')
+         .fontSize(20)
+         .font('Helvetica-Bold')
+         .text('Relatório de Disparo', 200, 45, { align: 'right' });
+      
+      doc.fontSize(10)
+         .font('Helvetica')
+         .fillColor('#666')
+         .text('ELT CERT', 200, 70, { align: 'right' });
+
+      doc.moveTo(50, 100).lineTo(545, 100).strokeColor('#eeeeee').lineWidth(1).stroke();
+      doc.moveDown(2);
+
+      // 2. DADOS DO DISPARO (BLOCO DE METADADOS)
+      const startY = 120;
+      doc.rect(50, startY, 495, 60).fill('#f5f5f5');
+      doc.fillColor('#1a1a1a');
+      
       const templateInfo = MANDRILL_TEMPLATES[dispatch.templateSlug as TemplateKey];
       const templateName = templateInfo ? templateInfo.name : dispatch.templateSlug;
+      const createdAt = dispatch.createdAt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
-      doc.fontSize(20).text('Relatório de Disparo - ELT CERT', { align: 'center' });
-      doc.moveDown();
-      doc.fontSize(12).text(`ID do Disparo: ${dispatch.id}`);
-      doc.text(`Template: ${templateName}`);
-      doc.text(`Data: ${dispatch.createdAt.toLocaleString('pt-BR')}`);
-      doc.text(`Sucesso: ${dispatch.totalSent}`);
-      doc.text(`Falha: ${dispatch.totalFailed}`);
-      doc.moveDown();
+      // Coluna Esquerda
+      doc.fontSize(9).font('Helvetica-Bold').text('Template:', 70, startY + 15).font('Helvetica').text(templateName, 130, startY + 15);
+      doc.font('Helvetica-Bold').text('Data:', 70, startY + 35).font('Helvetica').text(createdAt, 130, startY + 35);
 
-      // Tabela de Logs (Simplificada)
-      doc.fontSize(14).text('Destinatários', { underline: true });
-      doc.moveDown(0.5);
+      // Coluna Direita
+      doc.font('Helvetica-Bold').text('Total Enviados:', 300, startY + 15).font('Helvetica').text(String(dispatch.totalSent + dispatch.totalFailed), 390, startY + 15);
+      doc.font('Helvetica-Bold').text('Sucesso:', 300, startY + 30).fillColor('#16a34a').text(String(dispatch.totalSent), 390, startY + 30).fillColor('#1a1a1a');
+      doc.font('Helvetica-Bold').text('Falhas:', 300, startY + 45).fillColor('#dc2626').text(String(dispatch.totalFailed), 390, startY + 45).fillColor('#1a1a1a');
+
+      doc.moveDown(4);
+
+      // 3. TABELA DE DESTINATÁRIOS
+      const tableTop = 200;
+      doc.rect(50, tableTop, 495, 20).fill('#333333');
+      doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+      doc.text('NOME', 60, tableTop + 7, { width: 140 });
+      doc.text('E-MAIL', 200, tableTop + 7, { width: 160 });
+      doc.text('STATUS', 360, tableTop + 7, { width: 60 });
+      doc.text('HORÁRIO', 430, tableTop + 7, { width: 50 });
+      doc.text('ERRO', 485, tableTop + 7, { width: 60 });
+
+      let rowY = tableTop + 20;
+      doc.font('Helvetica').fillColor('#1a1a1a');
 
       (dispatch as any).logs.forEach((log: any, index: number) => {
-        const name = (JSON.parse(log.payloadJson || '{}').NAME) || 'Estudante';
-        const info = `${index + 1}. ${name} (${log.recipient}) - ${log.status}`;
-        doc.fontSize(10).text(info);
-        if (log.errorMessage) {
-          doc.fontSize(8).fillColor('red').text(`   Erro: ${log.errorMessage}`).fillColor('black');
+        // Page break safety
+        if (rowY > 730) {
+          doc.addPage();
+          rowY = 50;
+          // Redesenhar header na nova página
+          doc.rect(50, rowY, 495, 20).fill('#333333');
+          doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+          doc.text('NOME', 60, rowY + 7);
+          doc.text('E-MAIL', 200, rowY + 7);
+          doc.text('STATUS', 360, rowY + 7);
+          doc.text('HORÁRIO', 430, rowY + 7);
+          doc.text('ERRO', 485, rowY + 7);
+          rowY += 20;
+          doc.font('Helvetica').fillColor('#1a1a1a');
         }
+
+        // Zebra striping
+        if (index % 2 === 1) {
+          doc.rect(50, rowY, 495, 20).fill('#fcfcfc');
+        } else {
+          doc.rect(50, rowY, 495, 20).fill('#ffffff');
+        }
+
+        doc.fillColor('#1a1a1a');
+        const payload = JSON.parse(log.payloadJson || '{}');
+        const name = payload.NAME || 'Estudante';
+        const sentTime = (log.sentAt || log.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        doc.fontSize(8).text(name, 60, rowY + 6, { width: 135, ellipsis: true });
+        doc.text(log.recipient, 200, rowY + 6, { width: 155, ellipsis: true });
+        
+        if (log.status === 'SENT') {
+          doc.fillColor('#16a34a').font('Helvetica-Bold').text('SUCESSO', 360, rowY + 6).font('Helvetica');
+        } else {
+          doc.fillColor('#dc2626').font('Helvetica-Bold').text('FALHA', 360, rowY + 6).font('Helvetica');
+        }
+
+        doc.fillColor('#1a1a1a').text(sentTime, 430, rowY + 6, { width: 50 });
+        
+        if (log.errorMessage) {
+          doc.fillColor('#dc2626').fontSize(7).text(log.errorMessage, 485, rowY + 5, { width: 55, height: 12, ellipsis: true }).fontSize(8);
+        }
+
+        rowY += 20;
       });
+
+      // 4. RODAPÉ (EM TODAS AS PÁGINAS)
+      const pages = doc.bufferedPageRange();
+      for (let i = 0; i < pages.count; i++) {
+        doc.switchToPage(i);
+        const footerY = 800;
+        doc.moveTo(50, footerY - 5).lineTo(545, footerY - 5).strokeColor('#eeeeee').lineWidth(0.5).stroke();
+        doc.fontSize(7).fillColor('#999999');
+        doc.text(`ELT CERT — Relatório gerado em ${new Date().toLocaleString('pt-BR')}`, 50, footerY);
+        doc.text(`Página ${i + 1} de ${pages.count}`, 50, footerY, { align: 'right' });
+      }
 
       doc.end();
       return;

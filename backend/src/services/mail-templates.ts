@@ -33,7 +33,7 @@ export const MANDRILL_TEMPLATES: Record<string, EmailTemplateConfig> = {
     slug: 'exam-result',
     name: 'Resultado de Prova',
     description: 'Resultado da prova (Aprovado/Reprovado)',
-    mergeVars: ['NAME', 'EXAM_NAME', 'SCORE', 'STATUS'],
+    mergeVars: ['NAME', 'EXAM_NAME', 'SCORE', 'CORRETAS', 'ERRADAS', 'TOTAL_QUESTOES', 'STATUS'],
     eventSlug: ['EXAM_PASSED', 'EXAM_FAILED']
   },
   'cooldown-released': {

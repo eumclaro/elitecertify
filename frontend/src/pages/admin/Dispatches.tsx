@@ -180,8 +180,29 @@ export default function Dispatches() {
     }
   }, [filteredDispatches, selectedLogId, period]);
 
-  const handleExport = (dispatchId: string, format: 'csv' | 'pdf') => {
-    window.open(`${import.meta.env.VITE_API_URL}/dispatches/${dispatchId}/export?format=${format}`, '_blank');
+  const handleExport = async (dispatchId: string, formatType: 'csv' | 'pdf') => {
+    try {
+      const dispatch = filteredDispatches.find(d => d.id === dispatchId);
+      const templateName = TEMPLATES.find(t => t.slug === dispatch?.templateSlug)?.name || dispatch?.templateSlug || 'disparo';
+      const dateLabel = dispatch ? format(new Date(dispatch.createdAt), "dd-MM-yy") : format(new Date(), "dd-MM-yy");
+
+      const response = await api.get(`/dispatches/${dispatchId}/export?format=${formatType}`, {
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `disparo-${templateName}-${dateLabel}.${formatType}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Documento gerado com sucesso');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(`Erro ao gerar ${formatType.toUpperCase()}`);
+    }
   };
 
   const fetchInitialData = async () => {

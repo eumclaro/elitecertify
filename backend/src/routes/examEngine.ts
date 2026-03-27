@@ -210,6 +210,8 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
         resultStatus: passed ? 'PASSED' : 'FAILED',
         finishedAt: new Date(),
         score,
+        correctAnswers,
+        totalQuestions,
       },
     });
 
@@ -251,6 +253,9 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
         att.student.user.name,
         att.student.user.email,
         att.exam.title,
+        score,
+        correctAnswers,
+        totalQuestions,
         // futuramente gerar URL de print do certificado
         undefined,
         att.student.lastName || ''
@@ -260,6 +265,9 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
         att.student.user.name,
         att.student.user.email,
         att.exam.title,
+        score,
+        correctAnswers,
+        totalQuestions,
         endsAt || undefined,
         att.student.lastName || ''
       ).catch((err) => console.error('[MAIL] Fail-Mail Error:', err));

@@ -258,23 +258,49 @@ export async function sendExamReleasedEmail(name: string, email: string, examNam
   });
 }
 
-export async function sendExamPassedEmail(name: string, email: string, examName: string, certificateUrl?: string, lastName: string = '') {
+export async function sendExamPassedEmail(
+  name: string, 
+  email: string, 
+  examName: string, 
+  score: number,
+  correctAnswers: number,
+  totalQuestions: number,
+  certificateUrl?: string, 
+  lastName: string = ''
+) {
   return dispatchTemplateToMandrill('EXAM_PASSED', email, name, {
     NAME: name,
     'LAST-NAME': lastName,
     EMAIL: email,
     EXAM_NAME: examName,
+    SCORE: `${score}%`,
+    CORRETAS: correctAnswers,
+    ERRADAS: totalQuestions - correctAnswers,
+    TOTAL_QUESTOES: totalQuestions,
     CERTIFICATE_LINK: certificateUrl || '',
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
   });
 }
 
-export async function sendExamFailedEmail(name: string, email: string, examName: string, cooldownEndDate?: Date, lastName: string = '') {
+export async function sendExamFailedEmail(
+  name: string, 
+  email: string, 
+  examName: string, 
+  score: number,
+  correctAnswers: number,
+  totalQuestions: number,
+  cooldownEndDate?: Date, 
+  lastName: string = ''
+) {
   return dispatchTemplateToMandrill('EXAM_FAILED', email, name, {
     NAME: name,
     'LAST-NAME': lastName,
     EMAIL: email,
     EXAM_NAME: examName,
+    SCORE: `${score}%`,
+    CORRETAS: correctAnswers,
+    ERRADAS: totalQuestions - correctAnswers,
+    TOTAL_QUESTOES: totalQuestions,
     COOLDOWN_DATE: cooldownEndDate ? cooldownEndDate.toLocaleDateString('pt-BR') : '',
     COOLDOWN_TIME: cooldownEndDate ? cooldownEndDate.toLocaleTimeString('pt-BR') : '',
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'

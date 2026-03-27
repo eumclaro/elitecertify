@@ -14,6 +14,9 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +52,11 @@ import {
   ChevronRight,
   Loader2,
   Edit2,
-  ChevronDown
+  ChevronDown,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -120,7 +127,12 @@ export default function Students() {
 
   // Form state
   const [form, setForm] = useState({ name: '', lastName: '', email: '', password: '', cpf: '', phone: '' });
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // State for missing template warning
+  const [showNoTemplateDialog, setShowNoTemplateDialog] = useState(false);
 
   const loadStudents = async (page = 1) => {
     setLoading(true);
@@ -164,6 +176,8 @@ export default function Students() {
       cpf: student.cpf || '',
       phone: student.phone || '',
     });
+    setNewPassword('');
+    setShowPassword(false);
     setShowModal(true);
   };
   const openDataModal = (student: Student) => {
@@ -238,9 +252,17 @@ export default function Students() {
     setIsSaving(true);
     try {
       if (editing) {
-        await api.put(`/students/${editing.id}`, {
-          name: form.name, lastName: form.lastName, email: form.email, cpf: form.cpf || null, phone: form.phone || null,
-        });
+        const payload: any = {
+          name: form.name, 
+          lastName: form.lastName, 
+          email: form.email, 
+          cpf: form.cpf || null, 
+          phone: form.phone || null,
+        };
+        if (newPassword) {
+          payload.password = newPassword;
+        }
+        await api.put(`/students/${editing.id}`, payload);
         toast.success("Alterações salvas com sucesso");
       } else {
         await api.post('/students', {
@@ -277,7 +299,12 @@ export default function Students() {
       setConfirmResend(null);
       toast.success(`E-mail de acesso para ${confirmResend.user.name} enviado com sucesso!`);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Erro ao reenviar acesso');
+      if (err.response?.status === 412 && err.response?.data?.error === 'TEMPLATE_NOT_CONFIGURED') {
+        setConfirmResend(null);
+        setShowNoTemplateDialog(true);
+      } else {
+        toast.error(err.response?.data?.error || 'Erro ao reenviar acesso');
+      }
     } finally {
       setActionLoading(false);
     }
@@ -525,6 +552,40 @@ export default function Students() {
                 <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="(11) 99999-9999" />
               </div>
             </div>
+
+            {editing && (
+              <>
+                <div className="py-2">
+                  <Separator className="bg-muted/60" />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground opacity-60">Segurança de Acesso</Label>
+                  <div className="space-y-2 pt-1">
+                    <Label>Nova Senha (opcional)</Label>
+                    <div className="relative group">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                      <Input 
+                        type={showPassword ? "text" : "password"} 
+                        value={newPassword} 
+                        onChange={e => setNewPassword(e.target.value)} 
+                        className="pl-10 pr-10"
+                        placeholder="Deixe vazio para manter a atual"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setShowModal(false)} disabled={isSaving}>Cancelar</Button>
               <Button type="submit" disabled={isSaving}>
@@ -851,6 +912,39 @@ export default function Students() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmDelete(null)}>Cancelar</Button>
             <Button variant="destructive" onClick={executeDelete}>Excluir permanentemente</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Modal de Alerta de Template Não Configurado */}
+      <Dialog open={showNoTemplateDialog} onOpenChange={setShowNoTemplateDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-warning">
+              <AlertTriangle className="size-5" /> Atenção
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <Alert className="bg-amber-50 border-amber-200">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertTitle className="text-amber-800 font-bold">Template não configurado</AlertTitle>
+              <AlertDescription className="text-amber-700 text-xs">
+                O evento <strong>STUDENT_CREATED</strong> não possui um template de e-mail vinculado ou ativo no momento.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="ghost" onClick={() => setShowNoTemplateDialog(false)} className="sm:flex-1">
+              Fechar
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowNoTemplateDialog(false);
+                window.location.href = '/admin/emails';
+              }} 
+              className="sm:flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Configurar Templates
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

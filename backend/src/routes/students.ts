@@ -264,7 +264,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 // PUT /api/students/:id — Update student
 router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const { name, lastName, email, cpf, phone, status, active, classIds } = req.body;
+    const { name, lastName, email, password, cpf, phone, status, active, classIds } = req.body;
 
     const student = await prisma.student.findUnique({
       where: { id: req.params.id as string },
@@ -276,14 +276,18 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
     }
 
     // Update user fields
-    if (name || email || active !== undefined) {
+    if (name || email || active !== undefined || password) {
+      const userData: any = {};
+      if (name) userData.name = name;
+      if (email) userData.email = email;
+      if (active !== undefined) userData.active = active;
+      if (password) {
+        userData.passwordHash = await bcrypt.hash(password, 12);
+      }
+
       await prisma.user.update({
         where: { id: student.userId as string },
-        data: {
-          ...(name && { name }),
-          ...(email && { email }),
-          ...(active !== undefined && { active }),
-        },
+        data: userData,
       });
     }
 
@@ -347,6 +351,19 @@ router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), async (r
 
     if (!student) {
       return res.status(404).json({ error: 'Aluno não encontrado' });
+    }
+
+    // Validação de Vínculo de Template (Nova Regra Etapa 1)
+    const binding = await prisma.emailEventBinding.findUnique({ 
+      where: { eventKey: 'STUDENT_CREATED' },
+      include: { template: true }
+    });
+
+    if (!binding || !binding.isActive || !binding.template) {
+      return res.status(412).json({ 
+        error: 'TEMPLATE_NOT_CONFIGURED', 
+        message: 'O template STUDENT_CREATED não possui um vínculo ativo configurado.' 
+      });
     }
 
     const newPassword = Math.random().toString(36).slice(-8);

@@ -74,31 +74,130 @@ router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request,
   }
 });
 
-// GET /api/classes/:id/students — List students in a class
+// GET /api/classes/:id/students — List students with performance data and metrics
 router.get('/:id/students', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
+    const classId = req.params.id as string;
+    
     const classStudents = await prisma.classStudent.findMany({
-      where: { classId: req.params.id as string },
+      where: { classId },
       include: {
         student: {
           include: {
-            user: { select: { id: true, name: true, email: true } }
+            user: { select: { name: true, email: true } },
+            examAttempts: {
+              orderBy: { createdAt: 'desc' },
+              select: { score: true, resultStatus: true, finishedAt: true, startedAt: true }
+            },
+            cooldowns: {
+              where: { status: 'ACTIVE', endsAt: { gt: new Date() } },
+              orderBy: { endsAt: 'desc' },
+              take: 1
+            }
           }
         }
       },
       orderBy: { joinedAt: 'desc' }
     });
-    
-    const students = classStudents.map((cs: any) => ({
-      id: cs.student.id,
-      name: cs.student.user.name,
-      email: cs.student.user.email,
-      joinedAt: cs.joinedAt
-    }));
 
-    return res.json(students);
+    const metrics = { total: 0, approved: 0, reproved: 0, pending: 0, cooldown: 0 };
+    
+    const students = classStudents.map((cs: any) => {
+      const s = cs.student;
+      const attempts = s.examAttempts || [];
+      const activeCooldown = s.cooldowns[0] || null;
+      
+      const hasPassed = attempts.some((a: any) => a.resultStatus === 'PASSED');
+      const maxScore = attempts.length > 0 ? Math.max(...attempts.map((a: any) => a.score || 0)) : null;
+      const lastAttempt = attempts[0] || null;
+      const lastActivity = lastAttempt ? (lastAttempt.finishedAt || lastAttempt.startedAt) : null;
+
+      let status = 'PENDING';
+      if (hasPassed) {
+        status = 'APPROVED';
+      } else if (activeCooldown) {
+        status = 'COOLDOWN';
+      } else if (attempts.length > 0) {
+        status = 'REPROVED';
+      }
+
+      metrics.total++;
+      if (status === 'APPROVED') metrics.approved++;
+      else if (status === 'COOLDOWN') metrics.cooldown++;
+      else if (status === 'REPROVED') metrics.reproved++;
+      else metrics.pending++;
+
+      return {
+        id: s.id,
+        name: s.user.name,
+        email: s.user.email,
+        joinedAt: cs.joinedAt,
+        grade: maxScore,
+        status,
+        attempts: attempts.length,
+        cooldownUntil: activeCooldown ? activeCooldown.endsAt : null,
+        cooldownId: activeCooldown ? activeCooldown.id : null,
+        lastActivity
+      };
+    });
+
+    return res.json({ students, metrics });
   } catch (error) {
+    console.error('List class students error:', error);
     return res.status(500).json({ error: 'Erro ao buscar alunos da turma' });
+  }
+});
+
+// GET /api/classes/:id/export — Export class students to CSV
+router.get('/:id/export', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const classId = req.params.id as string;
+    const cls = await prisma.class.findUnique({ where: { id: classId }, select: { name: true } });
+    if (!cls) return res.status(404).json({ error: 'Turma não encontrada' });
+
+    const classStudents = await prisma.classStudent.findMany({
+      where: { classId },
+      include: {
+        student: {
+          include: {
+            user: { select: { name: true, email: true } },
+            examAttempts: {
+              select: { score: true, resultStatus: true }
+            },
+            cooldowns: {
+              where: { status: 'ACTIVE', endsAt: { gt: new Date() } },
+              orderBy: { endsAt: 'desc' },
+              take: 1
+            }
+          }
+        }
+      }
+    });
+
+    let csv = 'Nome,Email,Nota,Status,Tentativas,Cooldown ate\n';
+    classStudents.forEach((cs: any) => {
+      const s = cs.student;
+      const hasPassed = s.examAttempts.some((a: any) => a.resultStatus === 'PASSED');
+      const maxScore = s.examAttempts.length > 0 ? Math.max(...s.examAttempts.map((a: any) => a.score || 0)) : 0;
+      const activeCooldown = s.cooldowns[0] || null;
+      
+      let status = 'PENDING';
+      if (hasPassed) status = 'APPROVED';
+      else if (activeCooldown) status = 'COOLDOWN';
+      else if (s.examAttempts.length > 0) status = 'REPROVED';
+
+      const cooldownAt = activeCooldown ? activeCooldown.endsAt.toLocaleString('pt-BR') : '';
+      
+      csv += `"${s.user.name}","${s.user.email}",${maxScore},"${status}",${s.examAttempts.length},"${cooldownAt}"\n`;
+    });
+
+    const filename = `alunos-turma-${cls.name.replace(/\s+/g, '-').toLowerCase()}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    return res.send(csv);
+  } catch (error) {
+    console.error('Export class error:', error);
+    return res.status(500).json({ error: 'Erro ao exportar turma' });
   }
 });
 

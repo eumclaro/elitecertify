@@ -152,6 +152,8 @@ model ExamAttempt {
   startedAt       DateTime               @default(now()) @map("started_at")
   finishedAt      DateTime?              @map("finished_at")
   score           Float?
+  correctAnswers  Int?                   @map("correct_answers")
+  totalQuestions  Int?                   @map("total_questions")
   ip              String?
   device          String?
   createdAt       DateTime               @default(now()) @map("created_at")

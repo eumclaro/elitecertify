@@ -68,7 +68,7 @@ router.get('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: 
 router.get('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const student = await prisma.student.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         user: { select: { id: true, name: true, email: true, role: true, active: true, lastLoginAt: true, createdAt: true } },
         classes: { include: { class: true } },
@@ -91,7 +91,7 @@ router.get('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 router.get('/:id/cooldowns', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const cooldowns = await prisma.cooldown.findMany({
-      where: { studentId: req.params.id, status: 'ACTIVE' },
+      where: { studentId: req.params.id as string, status: 'ACTIVE' },
       include: { exam: { select: { id: true, title: true } } },
     });
     return res.json(cooldowns);
@@ -120,8 +120,10 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), async (req: Request
     };
 
     for (let i = 0; i < students.length; i++) {
-      const { name, email, password, cpf, phone, className } = students[i];
+      const { name, sobrenome, email, password, cpf, phone, className } = students[i];
       const rowNum = i + 1; // For better error reporting
+
+      const lastNameToSave = sobrenome || '';
 
       if (!name || !email) {
         results.errors++;
@@ -163,6 +165,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), async (req: Request
           data: {
             cpf: cpf || null,
             phone: phone || null,
+            lastName: lastNameToSave,
             user: {
               create: {
                 name,
@@ -180,7 +183,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), async (req: Request
         });
         
         // Disparo assíncrono para o aluno importado
-        sendWelcomeEmail(name, email, passwordToUse).catch(err => {
+        sendWelcomeEmail(name, email, passwordToUse, lastNameToSave).catch(err => {
           console.error(`Falha silenciosa no envio transacional para importado ${email}`);
         });
 
@@ -201,7 +204,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), async (req: Request
 // POST /api/students — Create student
 router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const { name, email, password, cpf, phone, classIds } = req.body;
+    const { name, lastName, email, password, cpf, phone, classIds } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
@@ -225,6 +228,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
       data: {
         cpf: cpf || null,
         phone: phone || null,
+        lastName: lastName || '',
         user: {
           create: {
             name,
@@ -246,7 +250,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
     });
 
     // Enviar e-mail de boas-vindas fire-and-forget
-    sendWelcomeEmail(name, email, password).catch(err => {
+    sendWelcomeEmail(name, email, password, lastName || '').catch(err => {
       console.error(`Falha ignorada no envio de e-mail de boas-vindas para ${email}`);
     });
 
@@ -260,10 +264,10 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 // PUT /api/students/:id — Update student
 router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const { name, email, cpf, phone, status, active, classIds } = req.body;
+    const { name, lastName, email, cpf, phone, status, active, classIds } = req.body;
 
     const student = await prisma.student.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { user: true },
     });
 
@@ -274,7 +278,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
     // Update user fields
     if (name || email || active !== undefined) {
       await prisma.user.update({
-        where: { id: student.userId },
+        where: { id: student.userId as string },
         data: {
           ...(name && { name }),
           ...(email && { email }),
@@ -285,10 +289,11 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 
     // Update student fields
     const updated = await prisma.student.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(cpf !== undefined && { cpf }),
         ...(phone !== undefined && { phone }),
+        ...(lastName !== undefined && { lastName }),
         ...(status && { status }),
       },
       include: {
@@ -299,10 +304,10 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 
     // Update class associations if provided
     if (classIds !== undefined) {
-      await prisma.classStudent.deleteMany({ where: { studentId: req.params.id } });
+      await prisma.classStudent.deleteMany({ where: { studentId: req.params.id as string } });
       if (classIds.length > 0) {
         await prisma.classStudent.createMany({
-          data: classIds.map((classId: string) => ({ classId, studentId: req.params.id })),
+          data: classIds.map((classId: string) => ({ classId, studentId: req.params.id as string })),
         });
       }
     }
@@ -317,13 +322,13 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 // DELETE /api/students/:id — Delete student
 router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const student = await prisma.student.findUnique({ where: { id: req.params.id } });
+    const student = await prisma.student.findUnique({ where: { id: req.params.id as string } });
     if (!student) {
       return res.status(404).json({ error: 'Aluno não encontrado' });
     }
 
     // Delete user (cascades to student)
-    await prisma.user.delete({ where: { id: student.userId } });
+    await prisma.user.delete({ where: { id: student.userId as string } });
 
     return res.json({ message: 'Aluno excluído com sucesso' });
   } catch (error) {
@@ -336,7 +341,7 @@ router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request,
 router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const student = await prisma.student.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { user: true }
     });
 
@@ -348,14 +353,14 @@ router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), async (r
     const passwordHash = await bcrypt.hash(newPassword, 12);
 
     await prisma.user.update({
-      where: { id: student.userId },
+      where: { id: student.userId as string },
       data: { passwordHash }
     });
 
     // Disparo aguardado para o aluno
     const s = student as any;
     try {
-      await sendWelcomeEmail(s.user.name, s.user.email, newPassword);
+      await sendWelcomeEmail(s.user.name, s.user.email, newPassword, s.lastName || '');
     } catch (err) {
       console.error(`Falha no reenvio transacional para ${s.user.email}:`, err);
       // Not failing the whole request because the password was already updated

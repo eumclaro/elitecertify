@@ -26,7 +26,7 @@ router.post('/start/:examId', authMiddleware, async (req: Request, res: Response
     const classIds = student.classes.map(c => c.classId);
     const release = await prisma.examRelease.findFirst({
       where: {
-        examId,
+        examId: examId as string,
         OR: [
           { studentId: student.id },
           { classId: { in: classIds } }
@@ -37,7 +37,7 @@ router.post('/start/:examId', authMiddleware, async (req: Request, res: Response
     if (!release) return res.status(403).json({ error: 'Você não tem liberação para esta prova.' });
 
     const exam = await prisma.exam.findUnique({
-      where: { id: examId },
+      where: { id: examId as string },
       include: { questions: { include: { alternatives: true }, orderBy: { order: 'asc' } } },
     });
     if (!exam) return res.status(404).json({ error: 'Prova não encontrada' });
@@ -46,7 +46,7 @@ router.post('/start/:examId', authMiddleware, async (req: Request, res: Response
     // Check max attempts
     if (exam.maxAttempts > 0) {
       const attemptCount = await prisma.examAttempt.count({
-        where: { examId, studentId: student.id, executionStatus: { not: 'IN_PROGRESS' } },
+        where: { examId: examId as string, studentId: student.id, executionStatus: { not: 'IN_PROGRESS' } },
       });
       if (attemptCount >= exam.maxAttempts) {
         return res.status(400).json({ error: `Número máximo de tentativas atingido (${exam.maxAttempts})` });
@@ -55,19 +55,20 @@ router.post('/start/:examId', authMiddleware, async (req: Request, res: Response
 
     // Check for in-progress attempt
     const inProgress = await prisma.examAttempt.findFirst({
-      where: { examId, studentId: student.id, executionStatus: 'IN_PROGRESS' },
+      where: { examId: examId as string, studentId: student.id, executionStatus: 'IN_PROGRESS' },
     });
     
+    const ex: any = exam;
     if (inProgress) {
-      const questions = exam.questionOrder === 'RANDOM'
-        ? exam.questions.sort(() => Math.random() - 0.5)
-        : exam.questions;
+      const questions = ex.questionOrder === 'RANDOM'
+        ? ex.questions.sort(() => Math.random() - 0.5)
+        : ex.questions;
 
       return res.json({
         attempt: inProgress,
-        questions: questions.map(q => ({
+        questions: questions.map((q: any) => ({
           id: q.id, text: q.text, type: q.type, order: q.order,
-          alternatives: q.alternatives.map(a => ({ id: a.id, text: a.text, order: a.order })),
+          alternatives: q.alternatives.map((a: any) => ({ id: a.id, text: a.text, order: a.order })),
         })),
         exam: { id: exam.id, title: exam.title, durationMinutes: exam.durationMinutes, passingScore: exam.passingScore, questionCount: exam.questionCount },
         existingAnswers: await prisma.answer.findMany({ where: { attemptId: inProgress.id } }),
@@ -76,7 +77,7 @@ router.post('/start/:examId', authMiddleware, async (req: Request, res: Response
 
     // Check cooldown
     const activeCooldown = await prisma.cooldown.findFirst({
-      where: { examId, studentId: student.id, status: 'ACTIVE', endsAt: { gt: new Date() } },
+      where: { examId: examId as string, studentId: student.id, status: 'ACTIVE', endsAt: { gt: new Date() } },
     });
     if (activeCooldown) {
       const remainingHours = Math.ceil((activeCooldown.endsAt.getTime() - Date.now()) / (1000 * 60 * 60));
@@ -86,7 +87,7 @@ router.post('/start/:examId', authMiddleware, async (req: Request, res: Response
     // Create attempt
     const { ip, device } = getClientInfo(req);
     const attempt = await prisma.examAttempt.create({
-      data: { examId, studentId: student.id, ip, device, executionStatus: 'IN_PROGRESS', resultStatus: 'PENDING' },
+      data: { examId: examId as string, studentId: student.id, ip, device, executionStatus: 'IN_PROGRESS', resultStatus: 'PENDING' },
     });
 
     // Audit
@@ -94,15 +95,15 @@ router.post('/start/:examId', authMiddleware, async (req: Request, res: Response
       data: { userId, action: 'EXAM_START', entity: 'ExamAttempt', entityId: attempt.id, ip, device },
     });
 
-    const questions = exam.questionOrder === 'RANDOM'
-      ? exam.questions.sort(() => Math.random() - 0.5)
-      : exam.questions;
+    const questions = ex.questionOrder === 'RANDOM'
+      ? ex.questions.sort(() => Math.random() - 0.5)
+      : ex.questions;
 
     return res.status(201).json({
       attempt,
-      questions: questions.map(q => ({
+      questions: questions.map((q: any) => ({
         id: q.id, text: q.text, type: q.type, order: q.order,
-        alternatives: q.alternatives.map(a => ({ id: a.id, text: a.text, order: a.order })),
+        alternatives: q.alternatives.map((a: any) => ({ id: a.id, text: a.text, order: a.order })),
       })),
       exam: { id: exam.id, title: exam.title, durationMinutes: exam.durationMinutes, passingScore: exam.passingScore, questionCount: exam.questionCount },
       existingAnswers: [],
@@ -121,18 +122,18 @@ router.post('/answer', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { attemptId, questionId, alternativeId } = req.body;
 
-    const attempt = await prisma.examAttempt.findUnique({ where: { id: attemptId } });
+    const attempt = await prisma.examAttempt.findUnique({ where: { id: attemptId as string } });
     if (!attempt || attempt.executionStatus !== 'IN_PROGRESS') {
       return res.status(400).json({ error: 'Tentativa não está em andamento' });
     }
 
-    const exam = await prisma.exam.findUnique({ where: { id: attempt.examId } });
+    const exam = await prisma.exam.findUnique({ where: { id: attempt.examId as string } });
     if (exam) {
       const elapsed = (Date.now() - attempt.startedAt.getTime()) / 60000;
       if (elapsed > exam.durationMinutes) {
         // Auto-abandon timeout
         await prisma.examAttempt.update({
-          where: { id: attemptId },
+          where: { id: attemptId as string },
           data: { executionStatus: 'EXPIRED', resultStatus: 'FAILED_TIMEOUT', finishedAt: new Date(), score: 0 },
         });
         
@@ -148,21 +149,21 @@ router.post('/answer', authMiddleware, async (req: Request, res: Response) => {
     }
 
     const existing = await prisma.answer.findFirst({
-      where: { attemptId, questionId },
+      where: { attemptId: attemptId as string, questionId: questionId as string },
     });
 
     const alternative = alternativeId
-      ? await prisma.alternative.findUnique({ where: { id: alternativeId } })
+      ? await prisma.alternative.findUnique({ where: { id: alternativeId as string } })
       : null;
 
     if (existing) {
       await prisma.answer.update({
-        where: { id: existing.id },
-        data: { alternativeId, isCorrect: alternative?.isCorrect || false },
+        where: { id: existing.id as string },
+        data: { alternativeId: alternativeId as string, isCorrect: alternative?.isCorrect || false },
       });
     } else {
       await prisma.answer.create({
-        data: { attemptId, questionId, alternativeId, isCorrect: alternative?.isCorrect || false },
+        data: { attemptId: attemptId as string, questionId: questionId as string, alternativeId: alternativeId as string, isCorrect: alternative?.isCorrect || false },
       });
     }
 
@@ -183,7 +184,7 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
     const userId = req.user!.userId;
 
     const attempt = await prisma.examAttempt.findUnique({
-      where: { id: attemptId },
+      where: { id: attemptId as string },
       include: { 
         answers: true, 
         exam: { include: { _count: { select: { questions: true } } } },
@@ -195,14 +196,15 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
       return res.status(400).json({ error: 'Tentativa não está em andamento' });
     }
 
+    const att: any = attempt;
     // Usar a quantidade exata de questões atribuídas a prova em vez do campo genérico
-    const totalQuestions = attempt.exam._count.questions;
-    const correctAnswers = attempt.answers.filter(a => a.isCorrect).length;
+    const totalQuestions = att.exam._count.questions;
+    const correctAnswers = att.answers.filter((a: any) => a.isCorrect).length;
     const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
-    const passed = score >= attempt.exam.passingScore;
+    const passed = score >= att.exam.passingScore;
 
     const updated = await prisma.examAttempt.update({
-      where: { id: attemptId },
+      where: { id: attemptId as string },
       data: {
         executionStatus: 'FINISHED',
         resultStatus: passed ? 'PASSED' : 'FAILED',
@@ -213,8 +215,8 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
 
     // Gerar cooldown se o aluno reprovou
     let endsAt: Date | null = null;
-    if (!passed && attempt.exam.cooldownDays > 0) {
-      endsAt = new Date(Date.now() + attempt.exam.cooldownDays * 24 * 60 * 60 * 1000);
+    if (!passed && att.exam.cooldownDays > 0) {
+      endsAt = new Date(Date.now() + att.exam.cooldownDays * 24 * 60 * 60 * 1000);
       await prisma.cooldown.create({
         data: { studentId: attempt.studentId, examId: attempt.examId, endsAt, status: 'ACTIVE' },
       });
@@ -238,7 +240,7 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
     await prisma.auditEvent.create({
       data: {
         userId, action: passed ? 'EXAM_PASSED' : 'EXAM_FAILED',
-        entity: 'ExamAttempt', entityId: attemptId, ip, device,
+        entity: 'ExamAttempt', entityId: attemptId as string, ip, device,
         metadata: JSON.stringify({ score, correctAnswers, totalQuestions }),
       },
     });
@@ -246,18 +248,20 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
     // DISPARO DE E-MAILS ASSÍNCRONO
     if (passed) {
       sendExamPassedEmail(
-        attempt.student.user.name,
-        attempt.student.user.email,
-        attempt.exam.title,
+        att.student.user.name,
+        att.student.user.email,
+        att.exam.title,
         // futuramente gerar URL de print do certificado
-        undefined
+        undefined,
+        att.student.lastName || ''
       ).catch((err) => console.error('[MAIL] Pass-Mail Error:', err));
     } else {
       sendExamFailedEmail(
-        attempt.student.user.name,
-        attempt.student.user.email,
-        attempt.exam.title,
-        endsAt || undefined
+        att.student.user.name,
+        att.student.user.email,
+        att.exam.title,
+        endsAt || undefined,
+        att.student.lastName || ''
       ).catch((err) => console.error('[MAIL] Fail-Mail Error:', err));
     }
 
@@ -279,7 +283,7 @@ router.post('/abandon/:attemptId', authMiddleware, async (req: Request, res: Res
     console.log(`[ABANDON] Received abandon request for attempt ${attemptId} due to ${reason}`);
 
     const attempt = await prisma.examAttempt.findUnique({
-      where: { id: attemptId },
+      where: { id: attemptId as string },
       include: { exam: true },
     });
 
@@ -295,7 +299,7 @@ router.post('/abandon/:attemptId', authMiddleware, async (req: Request, res: Res
 
     console.log(`[ABANDON] Updating attempt ${attemptId} to ABANDONED`);
     await prisma.examAttempt.update({
-      where: { id: attemptId },
+      where: { id: attemptId as string },
       data: { executionStatus: 'ABANDONED', resultStatus: 'FAILED_ABANDONMENT', finishedAt: new Date(), score: 0 },
     });
 
@@ -327,7 +331,7 @@ router.get('/result/:attemptId', authMiddleware, async (req: Request, res: Respo
     const { attemptId } = req.params;
 
     const attempt = await prisma.examAttempt.findUnique({
-      where: { id: attemptId },
+      where: { id: attemptId as string },
       include: {
         exam: true,
         answers: { include: { question: { include: { alternatives: { orderBy: { order: 'asc' } } } }, alternative: true } },
@@ -338,17 +342,18 @@ router.get('/result/:attemptId', authMiddleware, async (req: Request, res: Respo
     if (!attempt) return res.status(404).json({ error: 'Tentativa não encontrada' });
     if (attempt.executionStatus === 'IN_PROGRESS') return res.status(400).json({ error: 'Prova ainda em andamento' });
 
+    const attRes: any = attempt;
     const allQuestions = await prisma.question.findMany({
-      where: { examId: attempt.examId },
+      where: { examId: attRes.examId },
       include: { alternatives: { orderBy: { order: 'asc' } } },
       orderBy: { order: 'asc' },
     });
 
     let review;
-    if (attempt.resultStatus === 'PASSED') {
+    if (attRes.resultStatus === 'PASSED') {
       // Return ALL questions
       review = allQuestions.map(q => {
-        const answer = attempt.answers.find(a => a.questionId === q.id);
+        const answer = attRes.answers.find((a: any) => a.questionId === q.id);
         return {
           id: q.id, text: q.text, order: q.order,
           alternatives: q.alternatives.map(a => ({ id: a.id, text: a.text, order: a.order, isCorrect: a.isCorrect, wasSelected: answer?.alternativeId === a.id })),
@@ -359,11 +364,11 @@ router.get('/result/:attemptId', authMiddleware, async (req: Request, res: Respo
       // Return ONLY incorrect questions (FAILED, FAILED_ABANDONMENT, FAILED_TIMEOUT)
       review = allQuestions
         .filter(q => {
-          const answer = attempt.answers.find(a => a.questionId === q.id);
+          const answer = attRes.answers.find((a: any) => a.questionId === q.id);
           return !answer || !answer.isCorrect;
         })
         .map(q => {
-          const answer = attempt.answers.find(a => a.questionId === q.id);
+          const answer = attRes.answers.find((a: any) => a.questionId === q.id);
           return {
             id: q.id, text: q.text, order: q.order,
             alternatives: q.alternatives.map(a => ({ id: a.id, text: a.text, order: a.order, isCorrect: a.isCorrect, wasSelected: answer?.alternativeId === a.id })),
@@ -374,14 +379,14 @@ router.get('/result/:attemptId', authMiddleware, async (req: Request, res: Respo
 
     return res.json({
       attempt: {
-        id: attempt.id, executionStatus: attempt.executionStatus, resultStatus: attempt.resultStatus, score: attempt.score,
-        startedAt: attempt.startedAt, finishedAt: attempt.finishedAt,
+        id: attRes.id, executionStatus: attRes.executionStatus, resultStatus: attRes.resultStatus, score: attRes.score,
+        startedAt: attRes.startedAt, finishedAt: attRes.finishedAt,
       },
-      exam: { id: attempt.exam.id, title: attempt.exam.title, passingScore: attempt.exam.passingScore },
+      exam: { id: attRes.exam.id, title: attRes.exam.title, passingScore: attRes.exam.passingScore },
       totalQuestions: allQuestions.length,
-      correctAnswers: attempt.answers.filter(a => a.isCorrect).length,
+      correctAnswers: attRes.answers.filter((a: any) => a.isCorrect).length,
       review,
-      certificate: attempt.certificate,
+      certificate: attRes.certificate,
     });
   } catch (error: any) {
     console.error('Get result error:', error);

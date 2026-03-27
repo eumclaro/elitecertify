@@ -1,4 +1,5 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect } from 'react';
+import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 
@@ -24,10 +25,7 @@ interface Exam {
   createdAt: string;
 }
 
-interface Option {
-  id: string;
-  name: string;
-}
+
 
 export default function Exams() {
   const navigate = useNavigate();

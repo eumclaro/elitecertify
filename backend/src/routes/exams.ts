@@ -59,7 +59,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
     const exam = await prisma.exam.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         releases: {
           include: {
@@ -82,15 +82,16 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
     }
 
     // Se aluno, omite isCorrect e limpa a visualização de questionOrder/cooldown p segurança
+    const examData = exam as any;
     if (req.user?.role === 'STUDENT') {
-      exam.questions.forEach(q => {
-        q.alternatives.forEach(a => {
-          (a as any).isCorrect = undefined;
+      examData.questions.forEach((q: any) => {
+        q.alternatives.forEach((a: any) => {
+          a.isCorrect = undefined;
         });
       });
     }
 
-    return res.json(exam);
+    return res.json(examData);
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao buscar prova' });
   }
@@ -146,13 +147,13 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
       cooldownDays, questionOrder, status
     } = req.body;
 
-    const existing = await prisma.exam.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.exam.findUnique({ where: { id: req.params.id as string } });
     if (!existing) {
       return res.status(404).json({ error: 'Prova não encontrada' });
     }
 
     const exam = await prisma.exam.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description }),
@@ -184,15 +185,15 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 // DELETE /api/exams/:id — Delete exam
 router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const existing = await prisma.exam.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.exam.findUnique({ where: { id: req.params.id as string } });
     if (!existing) {
       return res.status(404).json({ error: 'Prova não encontrada' });
     }
 
-    await prisma.exam.delete({ where: { id: req.params.id } });
+    await prisma.exam.delete({ where: { id: req.params.id as string } });
     
     await prisma.auditEvent.create({
-      data: { userId: req.user!.userId, action: 'EXAM_DELETED', entity: 'Exam', entityId: req.params.id, ip: req.ip }
+      data: { userId: req.user!.userId, action: 'EXAM_DELETED', entity: 'Exam', entityId: req.params.id as string, ip: req.ip }
     });
 
     return res.json({ message: 'Prova excluída com sucesso' });
@@ -219,7 +220,7 @@ router.post('/:id/releases', authMiddleware, requireRole('ADMIN'), async (req: R
 
     const release = await prisma.examRelease.create({
       data: {
-        examId,
+        examId: examId as string,
         classId: classId || null,
         studentId: studentId || null,
         releasedBy: req.user!.userId
@@ -227,7 +228,7 @@ router.post('/:id/releases', authMiddleware, requireRole('ADMIN'), async (req: R
       include: {
         exam: { select: { title: true } },
         class: { select: { id: true, name: true } },
-        student: { select: { id: true, user: { select: { name: true, email: true } } } }
+        student: { select: { id: true, lastName: true, user: { select: { name: true, email: true } } } }
       }
     });
 
@@ -236,8 +237,9 @@ router.post('/:id/releases', authMiddleware, requireRole('ADMIN'), async (req: R
     });
 
     // DISPARO DE E-MAIL EM LOTE OU INDIVIDUAL (Síncrono para retornar ok, mas async por baixo)
-    if (studentId && release.student) {
-      sendExamReleasedEmail(release.student.user.name, release.student.user.email, release.exam.title).catch(() => {});
+    const rel = release as any;
+    if (studentId && rel.student) {
+      sendExamReleasedEmail(rel.student.user.name, rel.student.user.email, rel.exam.title, rel.student.lastName || '').catch(() => {});
     } else if (classId) {
       // Find all students in this class
       prisma.classStudent.findMany({
@@ -245,8 +247,9 @@ router.post('/:id/releases', authMiddleware, requireRole('ADMIN'), async (req: R
         include: { student: { include: { user: true } } }
       }).then(classStudents => {
         for (const cs of classStudents) {
-          if (cs.student.user.email) {
-            sendExamReleasedEmail(cs.student.user.name, cs.student.user.email, release.exam.title).catch(() => {});
+          const student = cs.student as any;
+          if (student.user.email) {
+            sendExamReleasedEmail(student.user.name, student.user.email, rel.exam.title, student.lastName || '').catch(() => {});
           }
         }
       });
@@ -266,10 +269,10 @@ router.post('/:id/releases', authMiddleware, requireRole('ADMIN'), async (req: R
 router.delete('/:id/releases/:releaseId', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const { releaseId } = req.params;
-    await prisma.examRelease.delete({ where: { id: releaseId } });
+    await prisma.examRelease.delete({ where: { id: releaseId as string } });
     
     await prisma.auditEvent.create({
-      data: { userId: req.user!.userId, action: 'EXAM_RELEASE_REVOKED', entity: 'ExamRelease', entityId: releaseId, ip: req.ip }
+      data: { userId: req.user!.userId, action: 'EXAM_RELEASE_REVOKED', entity: 'ExamRelease', entityId: releaseId as string, ip: req.ip }
     });
     
     return res.json({ message: 'Liberação revogada com sucesso' });
@@ -289,24 +292,25 @@ router.put('/cooldowns/:id/clear', authMiddleware, requireRole('ADMIN'), async (
     const { id } = req.params;
     
     // Check if cooldown exists
-    const cooldown = await prisma.cooldown.findUnique({ where: { id } });
+    const cooldown = await prisma.cooldown.findUnique({ where: { id: id as string } });
     if (!cooldown) {
       return res.status(404).json({ error: 'Cooldown não encontrado' });
     }
 
     // Set to CLEARED
     const updated = await prisma.cooldown.update({
-      where: { id },
+      where: { id: id as string },
       data: { status: 'CLEARED' },
       include: { exam: { select: { title: true } }, student: { include: { user: true } } }
     });
 
     await prisma.auditEvent.create({
-      data: { userId: req.user!.userId, action: 'COOLDOWN_CLEARED_MANUALLY', entity: 'Cooldown', entityId: id, ip: req.ip }
+      data: { userId: req.user!.userId, action: 'COOLDOWN_CLEARED_MANUALLY', entity: 'Cooldown', entityId: id as string, ip: req.ip }
     });
 
     // Enviar aviso
-    sendCooldownReleasedEmail(updated.student.user.name, updated.student.user.email, updated.exam.title).catch(() => {});
+    const upd = updated as any;
+    sendCooldownReleasedEmail(upd.student.user.name, upd.student.user.email, upd.exam.title, upd.student.lastName || '').catch(() => {});
 
     return res.json({ message: 'Cooldown liberado com sucesso' });
   } catch (error) {

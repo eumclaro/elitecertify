@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext'; // Refresh trigger
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -68,6 +69,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <Toaster richColors closeButton position="top-right" />
       </AuthProvider>
     </BrowserRouter>
   );

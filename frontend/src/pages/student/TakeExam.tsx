@@ -7,12 +7,12 @@ let examIsMounted = false;
 let abandonTimeout: any = null;
 
 export default function TakeExam() {
-  const { attemptId } = useParams();
+  useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [examData, setExamData] = useState<any>(location.state || null);
+  const [examData] = useState<any>(location.state || null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);

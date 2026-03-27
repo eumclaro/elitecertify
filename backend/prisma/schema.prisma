@@ -7,9 +7,370 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================================
-// ENUMS
-// ============================================================
+model User {
+  id                String          @id @default(uuid())
+  name              String
+  email             String          @unique
+  passwordHash      String          @map("password_hash")
+  role              Role            @default(STUDENT)
+  active            Boolean         @default(true)
+  sessionToken      String?         @map("session_token")
+  lastLoginIp       String?         @map("last_login_ip")
+  lastLoginDevice   String?         @map("last_login_device")
+  lastLoginAt       DateTime?       @map("last_login_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  resetToken        String?         @map("reset_token")
+  resetTokenExpires DateTime?       @map("reset_token_expires")
+  auditEvents       AuditEvent[]
+  npsSurveys        NpsSurvey[]
+  student           Student?
+  systemSettings    SystemSetting[]
+
+  @@map("users")
+}
+
+model Student {
+  id             String         @id @default(uuid())
+  userId         String         @unique @map("user_id")
+  cpf            String?        @unique
+  phone          String?
+  lastName       String?        @map("last_name")
+  enrollmentDate DateTime       @default(now()) @map("enrollment_date")
+  status         String         @default("ACTIVE")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  certificates   Certificate[]
+  classes        ClassStudent[]
+  cooldowns      Cooldown[]
+  examAttempts   ExamAttempt[]
+  examReleases   ExamRelease[]
+  npsInvites     NpsInvite[]
+  npsResponses   NpsResponse[]
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("students")
+}
+
+model Class {
+  id           String         @id @default(uuid())
+  name         String
+  description  String?
+  startDate    DateTime?      @map("start_date")
+  endDate      DateTime?      @map("end_date")
+  status       String         @default("ACTIVE")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  students     ClassStudent[]
+  examReleases ExamRelease[]
+  npsSurveys   NpsSurvey[]
+
+  @@map("classes")
+}
+
+model ClassStudent {
+  id        String   @id @default(uuid())
+  classId   String   @map("class_id")
+  studentId String   @map("student_id")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, studentId])
+  @@map("class_students")
+}
+
+model Exam {
+  id              String        @id @default(uuid())
+  title           String
+  description     String?
+  questionCount   Int           @default(10) @map("question_count")
+  durationMinutes Int           @default(60) @map("duration_minutes")
+  passingScore    Float         @default(70) @map("passing_score")
+  maxAttempts     Int           @default(0) @map("max_attempts")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  cooldownDays    Int           @default(0) @map("cooldown_days")
+  questionOrder   QuestionOrder @default(FIXED) @map("question_order")
+  status          ExamStatus    @default(DRAFT)
+  certificates    Certificate[]
+  cooldowns       Cooldown[]
+  attempts        ExamAttempt[]
+  releases        ExamRelease[]
+  questions       Question[]
+
+  @@map("exams")
+}
+
+model Question {
+  id           String        @id @default(uuid())
+  examId       String        @map("exam_id")
+  text         String
+  order        Int           @default(0)
+  type         QuestionType  @default(SINGLE_CHOICE)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  alternatives Alternative[]
+  answers      Answer[]
+  exam         Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@map("questions")
+}
+
+model Alternative {
+  id         String   @id @default(uuid())
+  questionId String   @map("question_id")
+  text       String
+  isCorrect  Boolean  @default(false) @map("is_correct")
+  order      Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers    Answer[]
+
+  @@map("alternatives")
+}
+
+model ExamRelease {
+  id         String   @id @default(uuid())
+  examId     String   @map("exam_id")
+  classId    String?  @map("class_id")
+  releasedBy String   @map("released_by")
+  releasedAt DateTime @default(now()) @map("released_at")
+  studentId  String?  @map("student_id")
+  class      Class?   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  exam       Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student    Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+  @@map("exam_releases")
+}
+
+model ExamAttempt {
+  id              String                 @id @default(uuid())
+  examId          String                 @map("exam_id")
+  studentId       String                 @map("student_id")
+  startedAt       DateTime               @default(now()) @map("started_at")
+  finishedAt      DateTime?              @map("finished_at")
+  score           Float?
+  ip              String?
+  device          String?
+  createdAt       DateTime               @default(now()) @map("created_at")
+  executionStatus AttemptExecutionStatus @default(IN_PROGRESS) @map("execution_status")
+  resultStatus    AttemptResultStatus    @default(PENDING) @map("result_status")
+  answers         Answer[]
+  certificate     Certificate?
+  exam            Exam                   @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student         Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("exam_attempts")
+}
+
+model Answer {
+  id            String       @id @default(uuid())
+  attemptId     String       @map("attempt_id")
+  questionId    String       @map("question_id")
+  alternativeId String?      @map("alternative_id")
+  isCorrect     Boolean      @default(false) @map("is_correct")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  alternative   Alternative? @relation(fields: [alternativeId], references: [id])
+  attempt       ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question      Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("answers")
+}
+
+model Cooldown {
+  id        String         @id @default(uuid())
+  studentId String         @map("student_id")
+  examId    String         @map("exam_id")
+  startedAt DateTime       @default(now()) @map("started_at")
+  endsAt    DateTime       @map("ends_at")
+  status    CooldownStatus @default(ACTIVE)
+  exam      Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student   Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("cooldowns")
+}
+
+model Certificate {
+  id          String       @id @default(uuid())
+  studentId   String       @map("student_id")
+  examId      String       @map("exam_id")
+  attemptId   String       @unique @map("attempt_id")
+  code        String       @unique
+  issuedAt    DateTime     @default(now()) @map("issued_at")
+  webhookSent Boolean      @default(false) @map("webhook_sent")
+  attempt     ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  exam        Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  webhookLogs WebhookLog[]
+
+  @@map("certificates")
+}
+
+model WebhookLog {
+  id            String      @id @default(uuid())
+  certificateId String      @map("certificate_id")
+  url           String
+  payload       String
+  statusCode    Int?        @map("status_code")
+  response      String?
+  sentAt        DateTime    @default(now()) @map("sent_at")
+  certificate   Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+
+  @@map("webhook_logs")
+}
+
+model NpsSurvey {
+  id        String        @id @default(uuid())
+  title     String
+  classId   String?       @map("class_id")
+  createdBy String        @map("created_by")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  status    NpsStatus     @default(DRAFT)
+  invites   NpsInvite[]
+  questions NpsQuestion[]
+  responses NpsResponse[]
+  class     Class?        @relation(fields: [classId], references: [id])
+  creator   User          @relation(fields: [createdBy], references: [id])
+
+  @@map("nps_surveys")
+}
+
+model NpsQuestion {
+  id              String              @id @default(uuid())
+  surveyId        String              @map("survey_id")
+  text            String
+  order           Int                 @default(0)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  type            NpsQuestionType     @default(SCORE)
+  survey          NpsSurvey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  responseDetails NpsResponseDetail[]
+
+  @@map("nps_questions")
+}
+
+model NpsInvite {
+  id          String          @id @default(uuid())
+  surveyId    String          @map("survey_id")
+  studentId   String          @map("student_id")
+  token       String          @unique @default(uuid())
+  respondedAt DateTime?       @map("responded_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  status      NpsInviteStatus @default(PENDING)
+  student     Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  survey      NpsSurvey       @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  response    NpsResponse?
+
+  @@map("nps_invites")
+}
+
+model NpsResponse {
+  id        String              @id @default(uuid())
+  surveyId  String              @map("survey_id")
+  studentId String              @map("student_id")
+  inviteId  String?             @unique @map("invite_id")
+  createdAt DateTime            @default(now()) @map("created_at")
+  details   NpsResponseDetail[]
+  invite    NpsInvite?          @relation(fields: [inviteId], references: [id])
+  student   Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  survey    NpsSurvey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@map("nps_responses")
+}
+
+model NpsResponseDetail {
+  id         String      @id @default(uuid())
+  responseId String      @map("response_id")
+  questionId String      @map("question_id")
+  score      Int?
+  text       String?
+  question   NpsQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  response   NpsResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@map("nps_response_details")
+}
+
+model AuditEvent {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  ip        String?
+  device    String?
+  metadata  String?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_events")
+}
+
+model EmailLog {
+  id            String    @id @default(uuid())
+  eventKey      String    @map("event_key")
+  templateUsed  String    @map("template_used")
+  recipient     String
+  subject       String?
+  payloadJson   String?   @map("payload_json")
+  provider      String
+  mandrillMsgId String?   @unique @map("mandrill_msg_id")
+  status        String    @default("PENDING")
+  errorMessage  String?   @map("error_message")
+  sentAt        DateTime? @map("sent_at")
+  openedAt      DateTime? @map("opened_at")
+  clickedAt     DateTime? @map("clicked_at")
+  bouncedAt     DateTime? @map("bounced_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([mandrillMsgId])
+  @@index([recipient])
+  @@index([eventKey])
+  @@map("email_logs")
+}
+
+model EmailTemplate {
+  id               String              @id @default(uuid())
+  name             String
+  slug             String              @unique
+  provider         String              @default("MANDRILL")
+  status           String              @default("active")
+  allowedMergeVars String?             @map("allowed_merge_vars")
+  lastSyncedAt     DateTime?           @map("last_synced_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  bindings         EmailEventBinding[]
+
+  @@map("email_templates")
+}
+
+model EmailEventBinding {
+  id                 String        @id @default(uuid())
+  eventKey           String        @unique
+  templateId         String        @map("template_id")
+  isActive           Boolean       @default(true) @map("is_active")
+  fallbackTemplateId String?       @map("fallback_template_id")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  template           EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("email_event_bindings")
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedBy String?  @map("updated_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User?    @relation(fields: [updatedBy], references: [id])
+
+  @@map("system_settings")
+}
 
 enum Role {
   ADMIN
@@ -71,459 +432,4 @@ enum NpsInviteStatus {
 enum NpsQuestionType {
   SCORE
   TEXT
-}
-
-// ============================================================
-// AUTH & USERS
-// ============================================================
-
-model User {
-  id              String    @id @default(uuid())
-  name            String
-  email           String    @unique
-  passwordHash    String    @map("password_hash")
-  role            Role      @default(STUDENT)
-  active          Boolean   @default(true)
-  sessionToken    String?   @map("session_token")
-  lastLoginIp     String?   @map("last_login_ip")
-  lastLoginDevice String?   @map("last_login_device")
-  lastLoginAt     DateTime? @map("last_login_at")
-  resetToken      String?   @map("reset_token")
-  resetTokenExpires DateTime? @map("reset_token_expires")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  student      Student?
-  auditEvents    AuditEvent[]
-  npsSurveys     NpsSurvey[]
-  systemSettings SystemSetting[]
-
-  @@map("users")
-}
-
-// ============================================================
-// STUDENTS
-// ============================================================
-
-model Student {
-  id             String   @id @default(uuid())
-  userId         String   @unique @map("user_id")
-  cpf            String?  @unique
-  phone          String?
-  enrollmentDate DateTime @default(now()) @map("enrollment_date")
-  status         String   @default("ACTIVE")
-
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  classes        ClassStudent[]
-  examAttempts   ExamAttempt[]
-  cooldowns      Cooldown[]
-  certificates   Certificate[]
-  npsInvites     NpsInvite[]
-  npsResponses   NpsResponse[]
-  examReleases   ExamRelease[]
-
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  @@map("students")
-}
-
-// ============================================================
-// CLASSES (TURMAS)
-// ============================================================
-
-model Class {
-  id          String    @id @default(uuid())
-  name        String
-  description String?
-  startDate   DateTime? @map("start_date")
-  endDate     DateTime? @map("end_date")
-  status      String    @default("ACTIVE")
-
-  students     ClassStudent[]
-  examReleases ExamRelease[]
-  npsSurveys   NpsSurvey[]
-
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  @@map("classes")
-}
-
-model ClassStudent {
-  id        String   @id @default(uuid())
-  classId   String   @map("class_id")
-  studentId String   @map("student_id")
-  joinedAt  DateTime @default(now()) @map("joined_at")
-
-  class   Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  @@unique([classId, studentId])
-  @@map("class_students")
-}
-
-// ============================================================
-// EXAMS (PROVAS)
-// ============================================================
-
-model Exam {
-  id               String        @id @default(uuid())
-  title            String
-  description      String?
-  questionCount    Int           @default(10) @map("question_count")
-  durationMinutes  Int           @default(60) @map("duration_minutes")
-  passingScore     Float         @default(70) @map("passing_score")
-  maxAttempts      Int           @default(0)  @map("max_attempts")
-  cooldownDays     Int           @default(0)  @map("cooldown_days")
-  questionOrder    QuestionOrder @default(FIXED) @map("question_order")
-  status           ExamStatus    @default(DRAFT)
-
-  questions    Question[]
-  releases     ExamRelease[]
-  attempts     ExamAttempt[]
-  cooldowns    Cooldown[]
-  certificates Certificate[]
-
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  @@map("exams")
-}
-
-// ============================================================
-// QUESTIONS & ALTERNATIVES
-// ============================================================
-
-model Question {
-  id       String       @id @default(uuid())
-  examId   String       @map("exam_id")
-  text     String
-  order    Int          @default(0)
-  type     QuestionType @default(SINGLE_CHOICE)
-
-  exam         Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
-  alternatives Alternative[]
-  answers      Answer[]
-
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  @@map("questions")
-}
-
-model Alternative {
-  id         String  @id @default(uuid())
-  questionId String  @map("question_id")
-  text       String
-  isCorrect  Boolean @default(false) @map("is_correct")
-  order      Int     @default(0)
-
-  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  answers  Answer[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("alternatives")
-}
-
-// ============================================================
-// EXAM RELEASES (LIBERAÇÕES DE PROVA)
-// ============================================================
-
-model ExamRelease {
-  id         String   @id @default(uuid())
-  examId     String   @map("exam_id")
-  classId    String?  @map("class_id")
-  studentId  String?  @map("student_id")
-  releasedBy String   @map("released_by")
-  releasedAt DateTime @default(now()) @map("released_at")
-
-  exam    Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
-  class   Class?   @relation(fields: [classId], references: [id], onDelete: Cascade)
-  student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  @@index([examId])
-  @@map("exam_releases")
-}
-
-// ============================================================
-// EXAM ATTEMPTS & ANSWERS
-// ============================================================
-
-model ExamAttempt {
-  id              String                 @id @default(uuid())
-  examId          String                 @map("exam_id")
-  studentId       String                 @map("student_id")
-  startedAt       DateTime               @default(now()) @map("started_at")
-  finishedAt      DateTime?              @map("finished_at")
-  score           Float?
-  
-  executionStatus AttemptExecutionStatus @default(IN_PROGRESS) @map("execution_status")
-  resultStatus    AttemptResultStatus    @default(PENDING) @map("result_status")
-  
-  ip              String?
-  device          String?
-
-  exam        Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
-  student     Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  answers     Answer[]
-  certificate Certificate?
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("exam_attempts")
-}
-
-model Answer {
-  id            String  @id @default(uuid())
-  attemptId     String  @map("attempt_id")
-  questionId    String  @map("question_id")
-  alternativeId String? @map("alternative_id")
-  isCorrect     Boolean @default(false) @map("is_correct")
-
-  attempt     ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question    Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  alternative Alternative? @relation(fields: [alternativeId], references: [id], onDelete: SetNull)
-
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  @@map("answers")
-}
-
-// ============================================================
-// COOLDOWNS
-// ============================================================
-
-model Cooldown {
-  id        String         @id @default(uuid())
-  studentId String         @map("student_id")
-  examId    String         @map("exam_id")
-  startedAt DateTime       @default(now()) @map("started_at")
-  endsAt    DateTime       @map("ends_at")
-  status    CooldownStatus @default(ACTIVE)
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
-
-  @@map("cooldowns")
-}
-
-// ============================================================
-// CERTIFICATES & WEBHOOKS
-// ============================================================
-
-model Certificate {
-  id          String   @id @default(uuid())
-  studentId   String   @map("student_id")
-  examId      String   @map("exam_id")
-  attemptId   String   @unique @map("attempt_id")
-  code        String   @unique
-  issuedAt    DateTime @default(now()) @map("issued_at")
-  webhookSent Boolean  @default(false) @map("webhook_sent")
-
-  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  exam        Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
-  attempt     ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  webhookLogs WebhookLog[]
-
-  @@map("certificates")
-}
-
-model WebhookLog {
-  id            String   @id @default(uuid())
-  certificateId String   @map("certificate_id")
-  url           String
-  payload       String
-  statusCode    Int?     @map("status_code")
-  response      String?
-  sentAt        DateTime @default(now()) @map("sent_at")
-
-  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
-
-  @@map("webhook_logs")
-}
-
-// ============================================================
-// NPS
-// ============================================================
-
-model NpsSurvey {
-  id        String    @id @default(uuid())
-  title     String
-  classId   String?   @map("class_id")
-  status    NpsStatus @default(DRAFT)
-  createdBy String    @map("created_by")
-
-  class     Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
-  creator   User          @relation(fields: [createdBy], references: [id])
-  questions NpsQuestion[]
-  invites   NpsInvite[]
-  responses NpsResponse[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("nps_surveys")
-}
-
-model NpsQuestion {
-  id       String          @id @default(uuid())
-  surveyId String          @map("survey_id")
-  text     String
-  type     NpsQuestionType @default(SCORE)
-  order    Int             @default(0)
-
-  survey          NpsSurvey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  responseDetails NpsResponseDetail[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("nps_questions")
-}
-
-model NpsInvite {
-  id          String          @id @default(uuid())
-  surveyId    String          @map("survey_id")
-  studentId   String          @map("student_id")
-  token       String          @unique @default(uuid())
-  respondedAt DateTime?       @map("responded_at")
-  status      NpsInviteStatus @default(PENDING)
-
-  survey   NpsSurvey    @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  student  Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  response NpsResponse?
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("nps_invites")
-}
-
-model NpsResponse {
-  id        String  @id @default(uuid())
-  surveyId  String  @map("survey_id")
-  studentId String  @map("student_id")
-  inviteId  String? @unique @map("invite_id")
-
-  survey  NpsSurvey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  student Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  invite  NpsInvite?          @relation(fields: [inviteId], references: [id], onDelete: SetNull)
-  details NpsResponseDetail[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("nps_responses")
-}
-
-model NpsResponseDetail {
-  id         String  @id @default(uuid())
-  responseId String  @map("response_id")
-  questionId String  @map("question_id")
-  score      Int?
-  text       String?
-
-  response NpsResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
-  question NpsQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-
-  @@map("nps_response_details")
-}
-
-// ============================================================
-// AUDIT
-// ============================================================
-
-model AuditEvent {
-  id        String   @id @default(uuid())
-  userId    String?  @map("user_id")
-  action    String
-  entity    String
-  entityId  String?  @map("entity_id")
-  ip        String?
-  device    String?
-  metadata  String?  // JSON string
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([entity, entityId])
-  @@index([userId])
-  @@index([createdAt])
-  @@map("audit_events")
-}
-
-// ============================================================
-// EMAIL LOGS & TRANSACTIONAL E-MAILS
-// ============================================================
-
-model EmailLog {
-  id            String    @id @default(uuid())
-  eventKey      String    @map("event_key")
-  templateUsed  String    @map("template_used")
-  recipient     String
-  subject       String?
-  payloadJson   String?   @map("payload_json")
-  provider      String
-  mandrillMsgId String?   @unique @map("mandrill_msg_id")
-  status        String    @default("PENDING")
-  errorMessage  String?   @map("error_message")
-
-  sentAt        DateTime? @map("sent_at")
-  openedAt      DateTime? @map("opened_at")
-  clickedAt     DateTime? @map("clicked_at")
-  bouncedAt     DateTime? @map("bounced_at")
-
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  @@index([mandrillMsgId])
-  @@index([recipient])
-  @@index([eventKey])
-  @@map("email_logs")
-}
-
-model EmailTemplate {
-  id                   String   @id @default(uuid())
-  name                 String   // Nome amigável
-  slug                 String   @unique // slug do Mandrill (template_name)
-  provider             String   @default("MANDRILL")
-  status               String   @default("active")
-  allowedMergeVars     String?  @map("allowed_merge_vars") // JSON array de strings
-  lastSyncedAt         DateTime? @map("last_synced_at")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
-
-  bindings             EmailEventBinding[]
-
-  @@map("email_templates")
-}
-
-model EmailEventBinding {
-  id                 String   @id @default(uuid())
-  eventKey           String   @unique // ex: "STUDENT_CREATED"
-  templateId         String   @map("template_id")
-  isActive           Boolean  @default(true) @map("is_active")
-  fallbackTemplateId String?  @map("fallback_template_id")
-  
-  template           EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
-
-  @@map("email_event_bindings")
-}
-
-// ============================================================
-// SYSTEM SETTINGS
-// ============================================================
-
-model SystemSetting {
-  key       String   @id
-  value     String   // Formato JSON
-  updatedBy String?  @map("updated_by")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user User? @relation(fields: [updatedBy], references: [id], onDelete: SetNull)
-
-  @@map("system_settings")
 }

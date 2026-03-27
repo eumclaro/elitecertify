@@ -1,100 +1,47 @@
-import { useState, type ReactNode } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { type ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { AppSidebar } from './AppSidebar';
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, logout } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
-
-  const isAdmin = user?.role === 'ADMIN';
-
-  const adminLinks = [
-    { path: '/admin', label: 'Dashboard', icon: '📊' },
-    { path: '/admin/students', label: 'Alunos', icon: '👥' },
-    { path: '/admin/classes', label: 'Turmas', icon: '🏫' },
-    { path: '/admin/exams', label: 'Provas', icon: '📝' },
-    { path: '/admin/nps', label: 'NPS', icon: '📈' },
-    { path: '/admin/reports', label: 'Relatórios', icon: '📋' },
-    { path: '/admin/audit', label: 'Auditoria', icon: '🔒' },
-    { path: '/admin/smtp', label: 'SMTP', icon: '📧' },
-    { path: '/admin/emails', label: 'E-mails', icon: '📨' },
-  ];
-
-  const studentLinks = [
-    { path: '/student/exams', label: 'Minhas Provas', icon: '📝' },
-    { path: '/student/profile', label: 'Meu Perfil', icon: '👤' },
-  ];
-
-  const navLinks = isAdmin ? adminLinks : studentLinks;
-
-  const isActive = (path: string) => {
-    if (path === '/admin' || path === '/student/exams') return location.pathname === path;
-    return location.pathname.startsWith(path);
-  };
+  const { user } = useAuth();
 
   return (
-    <div className="layout">
-      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
-
-      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <img src="/logotipo-elite-training.png" alt="Elite Training" className="logo-img" />
-          </div>
-          <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
-        </div>
-
-        <nav className="sidebar-nav">
-          <div className="nav-section">
-            <span className="nav-section-title">{isAdmin ? 'GESTÃO' : 'MINHA ÁREA'}</span>
-            {navLinks.map(link => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`nav-link ${isActive(link.path) ? 'active' : ''}`}
-                onClick={() => setSidebarOpen(false)}
-              >
-                <span className="nav-icon">{link.icon}</span>
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="user-info">
-            <div className="user-avatar">{user?.name?.charAt(0) || 'U'}</div>
-            <div className="user-details">
-              <span className="user-name">{user?.name}</span>
-              <span className="user-role">{isAdmin ? 'Administrador' : 'Aluno'}</span>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 transition-all duration-200">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">ELT CERT</span>
+              <span className="text-sm font-semibold truncate max-w-[200px] md:max-w-none">
+                Olá, {user?.name?.split(' ')[0]}
+              </span>
             </div>
           </div>
-          <button className="logout-btn" onClick={handleLogout}>Sair</button>
-        </div>
-      </aside>
-
-      <main className="main-content">
-        <header className="top-header">
-          <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
-          <div className="header-right">
-            <span className="header-user">Olá, {user?.name?.split(' ')[0]}</span>
+          
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
+              {user?.name?.charAt(0)}
+            </div>
           </div>
         </header>
-        <div className="page-content">
+        
+        <main className="flex flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8 animate-in fade-in duration-500">
           {children}
-        </div>
-      </main>
-    </div>
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

@@ -225,36 +225,40 @@ export async function dispatchTemplateToMandrill(
 // SEMANTIC WRAPPERS - FASE 1 (MIGRATED TO MANDRILL)
 // ==========================================
 
-export async function sendWelcomeEmail(name: string, email: string, rawPassword?: string) {
+export async function sendWelcomeEmail(name: string, email: string, rawPassword?: string, lastName: string = '') {
   return dispatchTemplateToMandrill('STUDENT_CREATED', email, name, {
     NAME: name,
+    'LAST-NAME': lastName,
     EMAIL: email,
     PASSWORD: rawPassword || '',
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
   });
 }
 
-export async function sendPasswordResetEmail(name: string, email: string, resetLink: string) {
+export async function sendPasswordResetEmail(name: string, email: string, resetLink: string, lastName: string = '') {
   return dispatchTemplateToMandrill('AUTH_PASSWORD_RESET', email, name, {
     NAME: name,
+    'LAST-NAME': lastName,
     EMAIL: email,
     RESET_LINK: resetLink,
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
   });
 }
 
-export async function sendExamReleasedEmail(name: string, email: string, examName: string) {
+export async function sendExamReleasedEmail(name: string, email: string, examName: string, lastName: string = '') {
   return dispatchTemplateToMandrill('EXAM_RELEASED', email, name, {
     NAME: name,
+    'LAST-NAME': lastName,
     EMAIL: email,
     EXAM_NAME: examName,
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
   });
 }
 
-export async function sendExamPassedEmail(name: string, email: string, examName: string, certificateUrl?: string) {
+export async function sendExamPassedEmail(name: string, email: string, examName: string, certificateUrl?: string, lastName: string = '') {
   return dispatchTemplateToMandrill('EXAM_PASSED', email, name, {
     NAME: name,
+    'LAST-NAME': lastName,
     EMAIL: email,
     EXAM_NAME: examName,
     CERTIFICATE_LINK: certificateUrl || '',
@@ -262,9 +266,10 @@ export async function sendExamPassedEmail(name: string, email: string, examName:
   });
 }
 
-export async function sendExamFailedEmail(name: string, email: string, examName: string, cooldownEndDate?: Date) {
+export async function sendExamFailedEmail(name: string, email: string, examName: string, cooldownEndDate?: Date, lastName: string = '') {
   return dispatchTemplateToMandrill('EXAM_FAILED', email, name, {
     NAME: name,
+    'LAST-NAME': lastName,
     EMAIL: email,
     EXAM_NAME: examName,
     COOLDOWN_DATE: cooldownEndDate ? cooldownEndDate.toLocaleDateString('pt-BR') : '',
@@ -273,9 +278,10 @@ export async function sendExamFailedEmail(name: string, email: string, examName:
   });
 }
 
-export async function sendCooldownReleasedEmail(name: string, email: string, examName: string) {
+export async function sendCooldownReleasedEmail(name: string, email: string, examName: string, lastName: string = '') {
   return dispatchTemplateToMandrill('COOLDOWN_RELEASED', email, name, {
     NAME: name,
+    'LAST-NAME': lastName,
     EMAIL: email,
     EXAM_NAME: examName,
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'

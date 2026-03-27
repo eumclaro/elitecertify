@@ -170,7 +170,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'E-mail obrigatório' });
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email }, include: { student: true } });
     
     // Sempre retorna mensagem de sucesso para evitar user enumeration
     if (!user) {
@@ -189,7 +189,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     const resetLink = `${env.FRONTEND_URL || 'https://certify.elitetraining.com.br'}/reset-password?token=${resetToken}`;
     
     // Envia o e-mail sem aguardar para evitar que um atacante meça o tempo de resposta
-    sendPasswordResetEmail(user.name, user.email, resetLink).catch(() => {});
+    sendPasswordResetEmail(user.name, user.email, resetLink, user.student?.lastName || '').catch(() => {});
 
     // Registra evento para segurança
     const { ip, device } = getClientInfo(req);

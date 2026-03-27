@@ -149,6 +149,17 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
       return res.status(400).json({ error: 'Nenhum destinatário encontrado para o disparo' });
     }
 
+    // Criar o registro do Disparo PRIMEIRO para ter o ID para os logs
+    const dispatch = await prisma.dispatch.create({
+      data: {
+        templateSlug,
+        recipientGroup: recipientGroup || 'manual',
+        totalSent: 0,
+        totalFailed: 0,
+        failedEmails: [] as any
+      }
+    });
+
     const provider = getEmailProvider();
     const { fromEmail, fromName } = await getAuthorizedSender();
     
@@ -197,7 +208,9 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
             eventKey as EmailEventKey,
             student.user.email,
             student.user.name,
-            dynamicData
+            dynamicData,
+            undefined, // Use default subject from template if needed
+            dispatch.id // <--- Passar o ID do dispatch
           );
           
           results.success++;
@@ -213,10 +226,10 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
       await Promise.all(promises);
     }
 
-    const dispatch = await prisma.dispatch.create({
+    // Atualizar o registro do Disparo com os resultados finais
+    await prisma.dispatch.update({
+      where: { id: dispatch.id },
       data: {
-        templateSlug,
-        recipientGroup: recipientGroup || 'manual',
         totalSent: results.success,
         totalFailed: results.failed,
         failedEmails: results.errors as any
@@ -224,15 +237,113 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
     });
 
     return res.status(201).json({
-      ...dispatch,
-      successCount: dispatch.totalSent,
-      errorCount: dispatch.totalFailed,
-      totalCount: dispatch.totalSent + dispatch.totalFailed,
-      status: dispatch.totalFailed === 0 ? 'COMPLETED' : 'PARTIAL'
+      ...dispatch, // Note: partial data from initial create, but frontend expects dispatch object
+      successCount: results.success,
+      errorCount: results.failed,
+      totalCount: results.success + results.failed,
+      status: results.failed === 0 ? 'COMPLETED' : 'PARTIAL'
     });
   } catch (error: any) {
     console.error('Mass dispatch error:', error);
     return res.status(500).json({ error: 'Ocorreu um erro ao processar o envio em lote' });
+  }
+});
+
+// GET /api/dispatches/:id/logs — Listar logs de um disparo
+router.get('/:id/logs', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const logs = await (prisma.emailLog as any).findMany({
+      where: { dispatchId: req.params.id as string },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Mapear campos para o formato esperado pelo frontend
+    const mapped = logs.map((log: any) => ({
+      recipientName: (JSON.parse(log.payloadJson || '{}').NAME) || 'Estudante',
+      recipientEmail: log.recipient,
+      status: log.status,
+      failureReason: log.errorMessage,
+      sentAt: log.sentAt || log.createdAt,
+      mandrillMsgId: log.mandrillMsgId
+    }));
+
+    return res.json(mapped);
+  } catch (error) {
+    console.error('Get logs error:', error);
+    return res.status(500).json({ error: 'Erro ao carregar logs do disparo' });
+  }
+});
+
+// GET /api/dispatches/:id/export — Exportar logs (CSV ou PDF)
+router.get('/:id/export', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { format } = req.query;
+
+    const dispatch = await (prisma.dispatch as any).findUnique({
+      where: { id: req.params.id as string },
+      include: { logs: true }
+    });
+
+    if (!dispatch) return res.status(404).json({ error: 'Disparo não encontrado' });
+
+    if (format === 'csv') {
+      let csv = 'Nome,Email,Status,Erro,Data,MsgIDMandrill\n';
+      (dispatch as any).logs.forEach((log: any) => {
+        const name = (JSON.parse(log.payloadJson || '{}').NAME) || 'Estudante';
+        const dateObj = log.sentAt || log.createdAt;
+        const dateStr = dateObj.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+        csv += `"${name}","${log.recipient}","${log.status}","${log.errorMessage || ''}","${dateStr}","${log.mandrillMsgId || ''}"\n`;
+      });
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=dispatch-report-${id}.csv`);
+      return res.send(csv);
+    }
+
+    if (format === 'pdf') {
+      // Lazy-load pdfkit para evitar crashes se não instalado em runtime inicial
+      const PDFDocument = require('pdfkit');
+      const doc = new PDFDocument({ margin: 50 });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=dispatch-report-${id}.pdf`);
+      doc.pipe(res);
+
+      // Cabeçalho
+      const templateInfo = MANDRILL_TEMPLATES[dispatch.templateSlug as TemplateKey];
+      const templateName = templateInfo ? templateInfo.name : dispatch.templateSlug;
+
+      doc.fontSize(20).text('Relatório de Disparo - ELT CERT', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(12).text(`ID do Disparo: ${dispatch.id}`);
+      doc.text(`Template: ${templateName}`);
+      doc.text(`Data: ${dispatch.createdAt.toLocaleString('pt-BR')}`);
+      doc.text(`Sucesso: ${dispatch.totalSent}`);
+      doc.text(`Falha: ${dispatch.totalFailed}`);
+      doc.moveDown();
+
+      // Tabela de Logs (Simplificada)
+      doc.fontSize(14).text('Destinatários', { underline: true });
+      doc.moveDown(0.5);
+
+      (dispatch as any).logs.forEach((log: any, index: number) => {
+        const name = (JSON.parse(log.payloadJson || '{}').NAME) || 'Estudante';
+        const info = `${index + 1}. ${name} (${log.recipient}) - ${log.status}`;
+        doc.fontSize(10).text(info);
+        if (log.errorMessage) {
+          doc.fontSize(8).fillColor('red').text(`   Erro: ${log.errorMessage}`).fillColor('black');
+        }
+      });
+
+      doc.end();
+      return;
+    }
+
+    return res.status(400).json({ error: 'Formato de exportação inválido' });
+  } catch (error) {
+    console.error('Export error:', error);
+    return res.status(500).json({ error: 'Erro ao gerar exportação' });
   }
 });
 

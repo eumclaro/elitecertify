@@ -144,7 +144,8 @@ export async function dispatchTemplateToMandrill(
   toEmail: string, 
   toName: string, 
   dynamicData: Record<string, any>,
-  subject?: string
+  subject?: string,
+  dispatchId?: string
 ) {
   try {
     const provider = getEmailProvider();
@@ -196,8 +197,9 @@ export async function dispatchTemplateToMandrill(
         provider: 'MANDRILL',
         mandrillMsgId: msgId,
         status: 'SENT',
-        sentAt: new Date()
-      }
+        sentAt: new Date(),
+        dispatchId
+      } as any
     });
 
     console.log(`[MANDRILL - SUCCESS] Event: ${eventKey} | Dest: ${toEmail} | MsgID: ${msgId}`);
@@ -213,8 +215,9 @@ export async function dispatchTemplateToMandrill(
         recipient: toEmail,
         provider: 'MANDRILL',
         status: 'FAILED',
-        errorMessage: error.message
-      }
+        errorMessage: error.message,
+        dispatchId
+      } as any
     }).catch(() => {});
 
     throw error;

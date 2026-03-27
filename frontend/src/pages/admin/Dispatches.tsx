@@ -33,6 +33,16 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
 import { 
   Send, 
   Mail, 
@@ -42,15 +52,25 @@ import {
   CheckCircle2, 
   AlertCircle,
   Clock,
-  ChevronRight,
+  ChevronRight, 
   ChevronLeft,
   Search,
   School,
+  Download,
+  FileJson,
+  Filter,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 interface Template {
   slug: string;
@@ -95,6 +115,16 @@ export default function Dispatches() {
   const [recipientPreview, setRecipientPreview] = useState<any[]>([]);
   const [isResolving, setIsResolving] = useState(false);
 
+  // Log Tab State
+  const [selectedLogId, setSelectedLogId] = useState('');
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logFilter, setLogFilter] = useState<'ALL' | 'SENT' | 'FAILED'>('ALL');
+
+  // Period Filter State (30, 60, 90, custom days)
+  const [period, setPeriod] = useState<'30' | '60' | '90' | 'custom'>('30');
+  const [customRange, setCustomRange] = useState<{ from: Date | undefined; to: Date | undefined } | null>(null);
+
   useEffect(() => {
     fetchHistory();
     fetchInitialData();
@@ -109,6 +139,49 @@ export default function Dispatches() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchLogs = async (dispatchId: string) => {
+    if (!dispatchId) return;
+    setLoadingLogs(true);
+    try {
+      const response = await api.get(`/dispatches/${dispatchId}/logs`);
+      setLogs(response.data);
+    } catch (error) {
+      toast.error('Erro ao carregar logs do disparo');
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const filteredDispatches = dispatches.filter(d => {
+    const dispatchDate = new Date(d.createdAt);
+
+    if (period === 'custom' && customRange?.from && customRange?.to) {
+      const start = startOfDay(customRange.from);
+      const end = endOfDay(customRange.to);
+      return dispatchDate >= start && dispatchDate <= end;
+    }
+
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+    
+    const start = new Date();
+    start.setDate(now.getDate() - parseInt(period));
+    start.setHours(0, 0, 0, 0);
+
+    return dispatchDate >= start && dispatchDate <= now;
+  });
+
+  useEffect(() => {
+    if (selectedLogId && !filteredDispatches.find(d => d.id === selectedLogId)) {
+      setSelectedLogId('');
+      setLogs([]);
+    }
+  }, [filteredDispatches, selectedLogId, period]);
+
+  const handleExport = (dispatchId: string, format: 'csv' | 'pdf') => {
+    window.open(`${import.meta.env.VITE_API_URL}/dispatches/${dispatchId}/export?format=${format}`, '_blank');
   };
 
   const fetchInitialData = async () => {
@@ -222,10 +295,76 @@ export default function Dispatches() {
           <h1 className="text-3xl font-bold tracking-tight">Disparos de E-mail</h1>
           <p className="text-muted-foreground">Gerencie envios em massa e acompanhe o histórico de comunicações.</p>
         </div>
-        <Button onClick={() => setIsWizardOpen(true)} className="gap-2">
-          <Plus className="size-4" />
-          Novo Disparo
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border shadow-sm">
+            <span className="text-[10px] uppercase font-bold opacity-50 px-2">Período</span>
+            <ToggleGroup 
+              type="single" 
+              value={period === 'custom' ? undefined : period} 
+              onValueChange={(val) => {
+                if (val) {
+                  setPeriod(val as any);
+                  setCustomRange(null);
+                }
+              }} 
+              variant="outline" 
+              size="sm"
+              className="bg-background rounded-md"
+            >
+              <ToggleGroupItem value="30" className="text-xs h-7 px-3">30 dias</ToggleGroupItem>
+              <ToggleGroupItem value="60" className="text-xs h-7 px-3">60 dias</ToggleGroupItem>
+              <ToggleGroupItem value="90" className="text-xs h-7 px-3">90 dias</ToggleGroupItem>
+            </ToggleGroup>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className={`h-7 px-3 text-xs gap-2 ${period === 'custom' ? 'border-primary bg-primary/5 text-primary' : ''}`}
+                >
+                  <CalendarIcon className="size-3" />
+                  {customRange?.from && customRange?.to 
+                    ? `${format(customRange.from, 'dd/MM')} → ${format(customRange.to, 'dd/MM')}`
+                    : 'Personalizado'
+                  }
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-4 flex gap-4 shadow-xl border-primary/20" align="end">
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold opacity-60">De</Label>
+                  <Calendar
+                    mode="single"
+                    selected={customRange?.from}
+                    onSelect={(date) => {
+                      setCustomRange(prev => ({ from: date, to: prev?.to }));
+                      setPeriod('custom');
+                    }}
+                    locale={ptBR}
+                    className="border rounded-md bg-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold opacity-60">Até</Label>
+                  <Calendar
+                    mode="single"
+                    selected={customRange?.to}
+                    onSelect={(date) => {
+                      setCustomRange(prev => ({ from: prev?.from, to: date }));
+                      setPeriod('custom');
+                    }}
+                    locale={ptBR}
+                    className="border rounded-md bg-background"
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <Button onClick={() => setIsWizardOpen(true)} className="gap-2">
+            <Plus className="size-4" />
+            Novo Disparo
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -235,7 +374,7 @@ export default function Dispatches() {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Total Enviados</p>
-            <p className="text-2xl font-bold">{dispatches.reduce((acc, d) => acc + d.successCount, 0)}</p>
+            <p className="text-2xl font-bold">{filteredDispatches.reduce((acc, d) => acc + (d.totalCount || 0), 0)}</p>
           </div>
         </div>
         <div className="p-4 bg-card rounded-xl border flex items-center gap-4">
@@ -244,7 +383,7 @@ export default function Dispatches() {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Sucesso</p>
-            <p className="text-2xl font-bold">{dispatches.reduce((acc, d) => acc + d.successCount, 0)}</p>
+            <p className="text-2xl font-bold">{filteredDispatches.reduce((acc, d) => acc + d.successCount, 0)}</p>
           </div>
         </div>
         <div className="p-4 bg-card rounded-xl border flex items-center gap-4">
@@ -253,7 +392,7 @@ export default function Dispatches() {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Falhas</p>
-            <p className="text-2xl font-bold">{dispatches.reduce((acc, d) => acc + d.errorCount, 0)}</p>
+            <p className="text-2xl font-bold">{filteredDispatches.reduce((acc, d) => acc + d.errorCount, 0)}</p>
           </div>
         </div>
         <div className="p-4 bg-card rounded-xl border flex items-center gap-4">
@@ -262,67 +401,216 @@ export default function Dispatches() {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Lotes Processados</p>
-            <p className="text-2xl font-bold">{dispatches.length}</p>
+            <p className="text-2xl font-bold">{filteredDispatches.length}</p>
           </div>
         </div>
       </div>
 
-      <div className="bg-card rounded-xl border overflow-hidden">
-        <div className="p-4 border-b bg-muted/30 flex items-center gap-2">
-          <History className="size-4 text-muted-foreground" />
-          <h2 className="font-semibold">Histórico de Disparos</h2>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Template</TableHead>
-              <TableHead>Destinatários</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Data</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
-              </TableRow>
-            ) : dispatches.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhum disparo realizado ainda.</TableCell>
-              </TableRow>
-            ) : (
-              dispatches.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-blue-500">{TEMPLATES.find(t => t.slug === d.templateSlug)?.name || d.templateSlug}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase">{d.templateSlug}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <Badge variant="outline" className="w-fit">{d.recipientGroup === 'turma' ? 'Turma' : d.recipientGroup === 'manual' ? 'Manual' : 'Importação'}</Badge>
-                      <span className="text-xs text-muted-foreground">{d.successCount} enviados / {d.totalCount} total</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {d.status === 'COMPLETED' ? (
-                      <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Concluído</Badge>
-                    ) : d.status === 'PARTIAL' ? (
-                      <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20">Parcial</Badge>
-                    ) : (
-                      <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Erro</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {format(new Date(d.createdAt), "dd 'de' MMM, HH:mm", { locale: ptBR })}
-                  </TableCell>
+      <Tabs defaultValue="history" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="history" className="gap-2">
+            <History className="size-4" /> Histórico
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="gap-2">
+            <Search className="size-4" /> Consultar Log
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="history">
+          <div className="bg-card rounded-xl border overflow-hidden">
+            <div className="p-4 border-b bg-muted/30 flex items-center gap-2">
+              <History className="size-4 text-muted-foreground" />
+              <h2 className="font-semibold">Histórico de Disparos</h2>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Template</TableHead>
+                  <TableHead>Destinatários</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Data</TableHead>
                 </TableRow>
-              ))
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
+                  </TableRow>
+                ) : filteredDispatches.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhum disparo realizado no período selecionado.</TableCell>
+                  </TableRow>
+                ) : (
+                  filteredDispatches.map((d) => (
+                    <TableRow key={d.id}>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-blue-500">{TEMPLATES.find(t => t.slug === d.templateSlug)?.name || d.templateSlug}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase">{d.templateSlug}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant="outline" className="w-fit">{d.recipientGroup === 'turma' ? 'Turma' : d.recipientGroup === 'manual' ? 'Manual' : 'Importação'}</Badge>
+                          <span className="text-xs text-muted-foreground">{d.successCount} enviados / {d.totalCount} total</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {d.status === 'COMPLETED' ? (
+                          <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Concluído</Badge>
+                        ) : d.status === 'PARTIAL' ? (
+                          <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20">Parcial</Badge>
+                        ) : (
+                          <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Erro</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {format(new Date(d.createdAt), "dd 'de' MMM, HH:mm", { locale: ptBR })}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <div className="space-y-4">
+            <div className="p-4 bg-muted/10 border rounded-xl space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                <div className="flex items-center gap-4 flex-1 max-w-md">
+                  <div className="space-y-1 flex-1">
+                    <Label className="text-[10px] uppercase font-bold opacity-60 flex items-center gap-2">
+                      Lote de Disparo ({filteredDispatches.length})
+                      {filteredDispatches.length === 0 && (
+                        <span className="text-red-600 text-xs font-bold normal-case">— Sem Evento para este período</span>
+                      )}
+                    </Label>
+                    <Select value={selectedLogId} onValueChange={(val) => { setSelectedLogId(val); fetchLogs(val); }}>
+                      <SelectTrigger className={`w-full bg-background min-h-[40px] ${filteredDispatches.length === 0 ? 'border-red-500/50' : ''}`}>
+                        <div className="flex items-center gap-2 flex-1 text-left">
+                          {filteredDispatches.length === 0 ? (
+                            <span className="text-red-500 font-medium text-sm">Sem evento</span>
+                          ) : (
+                            <SelectValue placeholder="Escolha um disparo..." />
+                          )}
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredDispatches.map(d => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {TEMPLATES.find(t => t.slug === d.templateSlug)?.name || d.templateSlug} — {format(new Date(d.createdAt), "dd/MM/yy HH:mm")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {selectedLogId && (
+                  <div className="flex items-center gap-2 self-end">
+                    <Button variant="outline" size="sm" onClick={() => handleExport(selectedLogId, 'csv')} className="gap-2">
+                      <FileJson className="size-3" /> Exportar CSV
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleExport(selectedLogId, 'pdf')} className="gap-2">
+                      <Download className="size-3" /> Exportar PDF
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {selectedLogId ? (
+              <div className="bg-card rounded-xl border overflow-hidden">
+                <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Filter className="size-4 text-muted-foreground" />
+                    <h2 className="font-semibold text-sm">Destinatários do Lote</h2>
+                  </div>
+                  <div className="flex bg-muted p-0.5 rounded-lg border">
+                    <button 
+                      onClick={() => setLogFilter('ALL')}
+                      className={`px-3 py-1 text-[10px] uppercase font-bold rounded-md transition-all ${logFilter === 'ALL' ? 'bg-background shadow-sm' : 'opacity-40 hover:opacity-100'}`}
+                    >
+                      Todos
+                    </button>
+                    <button 
+                      onClick={() => setLogFilter('SENT')}
+                      className={`px-3 py-1 text-[10px] uppercase font-bold rounded-md transition-all ${logFilter === 'SENT' ? 'bg-background shadow-sm text-green-600' : 'opacity-40 hover:opacity-100'}`}
+                    >
+                      Sucesso
+                    </button>
+                    <button 
+                      onClick={() => setLogFilter('FAILED')}
+                      className={`px-3 py-1 text-[10px] uppercase font-bold rounded-md transition-all ${logFilter === 'FAILED' ? 'bg-background shadow-sm text-red-600' : 'opacity-40 hover:opacity-100'}`}
+                    >
+                      Falhas
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  {loadingLogs && (
+                    <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] flex items-center justify-center z-10">
+                      <Clock className="size-6 text-primary animate-pulse" />
+                    </div>
+                  )}
+                  <Table>
+                    <TableHeader className="bg-muted/20">
+                      <TableRow>
+                        <TableHead className="text-xs">Nome</TableHead>
+                        <TableHead className="text-xs">E-mail</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs">Horário</TableHead>
+                        <TableHead className="text-xs">MsgID Mandrill</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {logs
+                        .filter(l => logFilter === 'ALL' || l.status === logFilter)
+                        .map((log, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-medium">{log.recipientName}</TableCell>
+                            <TableCell className="text-muted-foreground">{log.recipientEmail}</TableCell>
+                            <TableCell>
+                              {log.status === 'SENT' ? (
+                                <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Enviado</Badge>
+                              ) : (
+                                <div className="flex flex-col gap-1">
+                                  <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Falha</Badge>
+                                  {log.failureReason && <span className="text-[10px] text-red-400 max-w-[150px] truncate" title={log.failureReason}>{log.failureReason}</span>}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {format(new Date(log.sentAt), "HH:mm:ss")}
+                            </TableCell>
+                            <TableCell className="text-[10px] font-mono text-muted-foreground">
+                              {log.mandrillMsgId || '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      {logs.filter(l => logFilter === 'ALL' || l.status === logFilter).length === 0 && !loadingLogs && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                            Nenhum registro encontrado para este filtro.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : (
+              <div className="py-20 text-center border border-dashed rounded-xl bg-muted/10">
+                <Search className="size-10 text-muted-foreground/20 mx-auto mb-4" />
+                <p className="text-muted-foreground">Selecione um disparo acima para visualizar o detalhamento individual.</p>
+              </div>
             )}
-          </TableBody>
-        </Table>
-      </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={isWizardOpen} onOpenChange={(open) => !sending && setIsWizardOpen(open)}>
         <DialogContent className="sm:max-w-[600px]">

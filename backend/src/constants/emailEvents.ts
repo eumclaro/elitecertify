@@ -10,6 +10,7 @@ export const EMAIL_MAPPINGS = {
   PASSWORD_RESET_COMPLETED: 'auth-password-reset-completed',
   CERTIFICATE_AVAILABLE: 'certificate-available',
   EXAM_DEADLINE_REMINDER: 'exam-deadline-reminder',
+  MANUAL_TEST: 'manual-test',
 } as const;
 
 export type EmailEventKey = keyof typeof EMAIL_MAPPINGS;

@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
-import { getEmailProvider, getAuthorizedSender } from '../services/mail';
+import { getEmailProvider, getAuthorizedSender, dispatchTemplateToMandrill } from '../services/mail';
 import { MANDRILL_TEMPLATES, TemplateKey } from '../services/mail-templates';
+import { EmailEventKey } from '../constants/emailEvents';
 
 const router = Router();
 
@@ -175,14 +176,30 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
             ...variables 
           };
 
-          await provider.sendTemplate({
-            toEmail: student.user.email,
-            toName: student.user.name,
-            templateSlug: templateConfig.slug,
-            dynamicData,
-            fromEmail,
-            fromName
-          });
+          // Decidir o eventKey com base no eventSlug do template
+          let eventKey: string;
+          if (Array.isArray(templateConfig.eventSlug)) {
+            // Caso especial: Resultado de Prova (branching por status)
+            if (variables.STATUS === 'APROVADO') {
+              eventKey = 'EXAM_PASSED';
+            } else if (variables.STATUS === 'REPROVADO') {
+              eventKey = 'EXAM_FAILED';
+            } else {
+              // Fallback para o primeiro se não houver status
+              eventKey = templateConfig.eventSlug[0];
+            }
+          } else {
+            eventKey = templateConfig.eventSlug;
+          }
+
+          // Chamar a função unificada que busca o vínculo real no DB e gera log em EmailLog
+          await dispatchTemplateToMandrill(
+            eventKey as EmailEventKey,
+            student.user.email,
+            student.user.name,
+            dynamicData
+          );
+          
           results.success++;
         } catch (err: any) {
           results.failed++;

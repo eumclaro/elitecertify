@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
-import { getEmailProvider, getAuthorizedSender } from '../services/mail';
+import { getEmailProvider, getAuthorizedSender, dispatchTemplateToMandrill } from '../services/mail';
+import { EmailEventKey } from '../constants/emailEvents';
 
 const router = Router();
 
@@ -121,6 +122,19 @@ router.post('/test', authMiddleware, requireRole('ADMIN'), async (req: Request, 
   try {
     const { toEmail, toName, templateSlug, dynamicData, subject, eventKey } = req.body;
 
+    if (eventKey) {
+      // Se um evento for fornecido, usamos a lógica oficial de vínculo (valida se há template vinculado)
+      const success = await dispatchTemplateToMandrill(
+        eventKey as EmailEventKey,
+        toEmail,
+        toName || 'Destinatário Teste',
+        dynamicData || {},
+        subject
+      );
+      return res.json({ message: 'E-mail de teste (via vínculo) enviado!', success });
+    }
+
+    // Se NÃO houver evento, enviamos direto pelo slug mas registramos como MANUAL_TEST
     const provider = getEmailProvider();
     const { fromEmail, fromName } = await getAuthorizedSender();
     
@@ -128,7 +142,7 @@ router.post('/test', authMiddleware, requireRole('ADMIN'), async (req: Request, 
       toEmail,
       toName,
       templateSlug,
-      eventKey: eventKey || 'MANUAL_TEST',
+      eventKey: 'MANUAL_TEST',
       subject: subject || 'E-mail de Teste - ELT CERT',
       dynamicData: dynamicData || {},
       fromEmail,
@@ -138,10 +152,11 @@ router.post('/test', authMiddleware, requireRole('ADMIN'), async (req: Request, 
     // Registrar Log Manual
     await prisma.emailLog.create({
       data: {
-        eventKey: eventKey || 'MANUAL_TEST',
+        eventKey: 'MANUAL_TEST',
         templateUsed: templateSlug,
         recipient: toEmail,
         subject: subject || 'E-mail de Teste - ELT CERT',
+        payloadJson: JSON.stringify(dynamicData || {}),
         provider: 'MANDRILL',
         mandrillMsgId: msgId,
         status: 'SENT',
@@ -149,7 +164,7 @@ router.post('/test', authMiddleware, requireRole('ADMIN'), async (req: Request, 
       }
     });
 
-    return res.json({ message: 'E-mail de teste enviado!', mandrillMsgId: msgId });
+    return res.json({ message: 'E-mail de teste (direto) enviado!', mandrillMsgId: msgId });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Erro ao enviar e-mail de teste' });
   }

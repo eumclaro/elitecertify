@@ -1,5 +1,49 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { 
+  RefreshCw, 
+  Plus, 
+  Eye, 
+  Send, 
+  Mail, 
+  Layers
+} from "lucide-react";
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface EmailTemplate {
   id: string;
@@ -19,16 +63,14 @@ interface EmailBinding {
 }
 
 const EVENT_KEYS = [
-  'AUTH_PASSWORD_RESET',
   'STUDENT_CREATED',
+  'AUTH_PASSWORD_RESET',
   'EXAM_RELEASED',
   'EXAM_PASSED',
   'EXAM_FAILED',
-  'EXAM_FAILED_COOLDOWN',
   'COOLDOWN_RELEASED',
-  'PASSWORD_RESET_COMPLETED',
-  'CERTIFICATE_AVAILABLE',
-  'EXAM_DEADLINE_REMINDER'
+  'EXAM_DEADLINE_REMINDER',
+  'CERTIFICATE_AVAILABLE'
 ];
 
 export default function EmailManagement() {
@@ -36,8 +78,6 @@ export default function EmailManagement() {
   const [bindings, setBindings] = useState<EmailBinding[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   // Modais
   const [showBindingModal, setShowBindingModal] = useState(false);
@@ -70,7 +110,7 @@ export default function EmailManagement() {
       setTemplates(tRes.data);
       setBindings(bRes.data);
     } catch (err: any) {
-      setError('Erro ao carregar dados do servidor');
+      toast.error('Erro ao carregar dados do servidor');
     } finally {
       setLoading(false);
     }
@@ -78,14 +118,12 @@ export default function EmailManagement() {
 
   const handleSync = async () => {
     setSyncing(true);
-    setError('');
     try {
       const res = await api.get('/email-templates/mandrill/sync');
-      setSuccess(`Sincronização concluída! Criados: ${res.data.created}, Atualizados: ${res.data.updated}`);
+      toast.success(`Sincronização concluída! Criados: ${res.data.created}, Atualizados: ${res.data.updated}`);
       fetchData();
-      setTimeout(() => setSuccess(''), 5000);
     } catch (err: any) {
-      setError('Erro ao sincronizar com Mandrill');
+      toast.error('Erro ao sincronizar com Mandrill');
     } finally {
       setSyncing(false);
     }
@@ -99,12 +137,11 @@ export default function EmailManagement() {
         templateId: selectedTemplateId,
         isActive: true
       });
-      setSuccess('Vínculo salvo com sucesso!');
+      toast.success('Vínculo salvo com sucesso!');
       fetchData();
       setShowBindingModal(false);
-      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Erro ao salvar vínculo');
+      toast.error('Erro ao salvar vínculo');
     }
   };
 
@@ -113,12 +150,11 @@ export default function EmailManagement() {
     setShowPreviewModal(true);
     setPreviewLoading(true);
     try {
-      // Usar vars padrão para preview
       const defaultVars = { NAME: 'Exemplo de Nome', SUPPORT_EMAIL: 'suporte@elt.com.br' };
       const res = await api.post('/email-templates/render', { slug, mergeVars: defaultVars });
       setPreviewHtml(res.data.html);
     } catch (err) {
-      setError('Erro ao renderizar preview');
+      toast.error('Erro ao renderizar preview');
     } finally {
       setPreviewLoading(false);
     }
@@ -134,184 +170,268 @@ export default function EmailManagement() {
         templateSlug: testSlug,
         dynamicData: parsedData
       });
-      setSuccess('E-mail de teste enviado com sucesso!');
+      toast.success('E-mail de teste enviado com sucesso!');
       setShowTestModal(false);
-      setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError('Erro ao enviar teste: ' + (err.response?.data?.error || err.message));
+      toast.error('Erro ao enviar teste: ' + (err.response?.data?.error || err.message));
     }
   };
 
-  if (loading) return <div className="page-loading"><div className="spinner"></div></div>;
+  if (loading) return <div className="flex h-[400px] items-center justify-center"><RefreshCw className="size-8 animate-spin text-muted-foreground" /></div>;
 
   return (
-    <div className="email-management">
-      <div className="page-header">
+    <div className="p-6 space-y-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2>Gestão de E-mails Transacionais</h2>
-          <p>Governança de templates Mandrill e vínculos com eventos do sistema.</p>
+          <h1 className="text-3xl font-bold tracking-tight">E-mails Transacionais</h1>
+          <p className="text-muted-foreground">Governança de templates Mandrill e vínculos com eventos do sistema.</p>
         </div>
-        <div className="page-actions">
-          <button className="btn btn-secondary" onClick={handleSync} disabled={syncing}>
-            {syncing ? 'Sincronizando...' : '🔄 Sincronizar Mandrill'}
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowBindingModal(true)}>
-            ➕ Novo Vínculo
-          </button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={handleSync} disabled={syncing} className="gap-2">
+            <RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Sincronizando...' : 'Sincronizar Mandrill'}
+          </Button>
+          <Button onClick={() => setShowBindingModal(true)} className="gap-2">
+            <Plus className="size-4" />
+            Novo Vínculo
+          </Button>
         </div>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
-
-      <div className="dashboard-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) 350px' }}>
-        <div className="dashboard-card">
-          <h3>Templates Integrados ({templates.length})</h3>
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nome / Slug</th>
-                  <th>Provedor</th>
-                  <th>Última Sinc</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {templates.map(t => (
-                  <tr key={t.id}>
-                    <td>
-                      <strong>{t.name}</strong>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.slug}</div>
-                    </td>
-                    <td><span className="badge badge-secondary">{t.provider}</span></td>
-                    <td>{t.lastSyncedAt ? new Date(t.lastSyncedAt).toLocaleDateString() : 'Nunca'}</td>
-                    <td className="actions">
-                      <button className="btn btn-sm btn-outline" onClick={() => handlePreview(t.slug)}>👁️ Preview</button>
-                      <button className="btn btn-sm btn-outline" onClick={() => { setTestSlug(t.slug); setShowTestModal(true); }}>📧 Teste</button>
-                    </td>
-                  </tr>
-                ))}
-                {templates.length === 0 && (
-                  <tr><td colSpan={4} className="empty-text">Nenhum template sincronizado. Clique em Sincronizar Mandrill.</td></tr>
-                )}
-              </tbody>
-            </table>
+      <div className="space-y-6">
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Mail className="size-5 text-blue-500" />
+            <h2 className="text-xl font-semibold">Templates Integrados</h2>
+            <Badge variant="secondary" className="ml-2">{templates.length}</Badge>
           </div>
+          <Card className="border-none shadow-sm">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6">Nome / Slug</TableHead>
+                    <TableHead>Provedor</TableHead>
+                    <TableHead>Última Sincronização</TableHead>
+                    <TableHead className="text-right px-6">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {templates.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        Nenhum template sincronizado. Clique em Sincronizar Mandrill.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    templates.map(t => (
+                      <TableRow key={t.id} className="hover:bg-muted/30 transition-colors group">
+                        <TableCell className="px-6">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{t.name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase">{t.slug}</span>
+                        </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-blue-500/5 text-blue-500 border-blue-500/20">
+                            {t.provider}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {t.lastSyncedAt ? format(new Date(t.lastSyncedAt), "dd 'de' MMM, HH:mm", { locale: ptBR }) : 'Nunca'}
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handlePreview(t.slug)} className="gap-2">
+                              <Eye className="size-3" /> Preview
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => { setTestSlug(t.slug); setShowTestModal(true); }} className="gap-2">
+                              <Send className="size-3" /> Teste
+                            </Button>
+                          </div>
+                   </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="dashboard-card">
-          <h3>Vínculos Ativos ({bindings.length})</h3>
-          <div className="bindings-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {bindings.map(b => (
-              <div key={b.id} style={{ padding: '12px', background: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '4px' }}>{b.eventKey}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  ➡️ {b.template?.name || b.template?.slug || 'Template não localizado'}
-                </div>
-                {!b.isActive && <span className="badge badge-warning" style={{ marginTop: '4px' }}>Inativo</span>}
-              </div>
-            ))}
-            {bindings.length === 0 && (
-              <p className="empty-text" style={{ padding: '16px' }}>Nenhum vínculo configurado.</p>
-            )}
+        <Separator />
+
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Layers className="size-5 text-orange-500" />
+            <h2 className="text-xl font-semibold">Vínculos Ativos</h2>
+            <Badge variant="secondary" className="ml-2">{bindings.length}</Badge>
           </div>
+          <Card className="border-none shadow-sm">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6">Evento do Sistema</TableHead>
+                    <TableHead>Template Vinculado</TableHead>
+                    <TableHead className="px-6">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bindings.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                        Nenhum vínculo configurado.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    bindings.map(b => (
+                      <TableRow key={b.id} className="hover:bg-muted/30 transition-colors group">
+                        <TableCell className="px-6">
+                          <code className="px-2 py-1 bg-muted rounded text-xs font-semibold text-orange-600">
+                            {b.eventKey}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Mail className="size-3 text-muted-foreground" />
+                            <span className="text-sm font-medium">
+                              {b.template?.name || b.template?.slug || 'Template não localizado'}
+                            </span>
+                          </div>
+                    </TableCell>
+                        <TableCell className="px-6">
+                          {b.isActive ? (
+                            <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Ativo</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">Inativo</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
       {/* Modal: Novo Vínculo */}
-      {showBindingModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Vincular Evento a Template</h3>
-              <button className="modal-close" onClick={() => setShowBindingModal(false)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Evento do Sistema</label>
-                <select value={selectedEvent} onChange={(e) => setSelectedEvent(e.target.value)}>
-                  <option value="">Selecione um evento...</option>
+      <Dialog open={showBindingModal} onOpenChange={setShowBindingModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vincular Evento a Template</DialogTitle>
+            <DialogDescription>
+              Selecione um evento do sistema e o template Mandrill correspondente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Evento do Sistema</Label>
+              <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um evento..." />
+                </SelectTrigger>
+                <SelectContent>
                   {EVENT_KEYS.map(key => (
-                    <option key={key} value={key}>{key}</option>
+                    <SelectItem key={key} value={key}>{key}</SelectItem>
                   ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Template Mandrill</label>
-                <select value={selectedTemplateId} onChange={(e) => setSelectedTemplateId(e.target.value)}>
-                  <option value="">Selecione um template...</option>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Template Mandrill</Label>
+              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um template..." />
+                </SelectTrigger>
+                <SelectContent>
                   {templates.map(t => (
-                    <option key={t.id} value={t.id}>{t.name} ({t.slug})</option>
+                    <SelectItem key={t.id} value={t.id}>{t.name} ({t.slug})</SelectItem>
                   ))}
-                </select>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowBindingModal(false)}>Cancelar</button>
-                <button className="btn btn-primary" onClick={handleSaveBinding}>Salvar Vínculo</button>
-              </div>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBindingModal(false)}>Cancelar</Button>
+            <Button onClick={handleSaveBinding}>Salvar Vínculo</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal: Preview */}
-      {showPreviewModal && (
-        <div className="modal-overlay">
-          <div className="modal modal-lg" style={{ height: '80vh', display: 'flex', flexDirection: 'column' }}>
-            <div className="modal-header">
-              <h3>Visualização do Template</h3>
-              <button className="modal-close" onClick={() => setShowPreviewModal(false)}>✕</button>
-            </div>
-            <div className="modal-body" style={{ flex: 1, padding: 0, overflow: 'hidden' }}>
-              {previewLoading ? (
-                <div className="page-loading"><div className="spinner"></div></div>
-              ) : (
-                <iframe
-                  srcDoc={previewHtml}
-                  style={{ width: '100%', height: '100%', border: 'none', background: 'white' }}
-                  title="Mandrill Preview"
-                />
-              )}
-            </div>
+      <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 border-b">
+            <DialogTitle>Visualização do Template</DialogTitle>
+            <DialogDescription>
+              Renderização do template utilizando variáveis de teste.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 bg-white relative">
+            {previewLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+                <RefreshCw className="size-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <iframe
+                srcDoc={previewHtml}
+                className="w-full h-full border-none"
+                title="Mandrill Preview"
+              />
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal: Teste de Disparo */}
-      {showTestModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Disparar E-mail de Teste</h3>
-              <button className="modal-close" onClick={() => setShowTestModal(false)}>✕</button>
+      <Dialog open={showTestModal} onOpenChange={setShowTestModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disparar E-mail de Teste</DialogTitle>
+            <DialogDescription>
+              Envie um e-mail real para validar as merge tags e o layout no seu inbox.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>E-mail do Destinatário</Label>
+              <Input 
+                type="email" 
+                value={testEmail} 
+                onChange={e => setTestEmail(e.target.value)} 
+                placeholder="ex: seu@email.com" 
+              />
             </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>E-mail do Destinatário</label>
-                <input type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="ex: seu@email.com" />
-              </div>
-              <div className="form-group">
-                <label>Nome do Destinatário</label>
-                <input type="text" value={testName} onChange={e => setTestName(e.target.value)} placeholder="ex: João Silva" />
-              </div>
-              <div className="form-group">
-                <label>Variáveis de Teste (JSON)</label>
-                <textarea 
-                  rows={5} 
-                  value={testData} 
-                  onChange={e => setTestData(e.target.value)}
-                  style={{ fontFamily: 'monospace', fontSize: '12px' }}
-                />
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowTestModal(false)}>Cancelar</button>
-                <button className="btn btn-primary" onClick={handleSendTest}>Enviar Teste Agora</button>
-              </div>
+            <div className="space-y-2">
+              <Label>Nome do Destinatário</Label>
+              <Input 
+                type="text" 
+                value={testName} 
+                onChange={e => setTestName(e.target.value)} 
+                placeholder="ex: João Silva" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Variáveis de Teste (JSON)</Label>
+              <Textarea 
+                rows={5} 
+                value={testData} 
+                onChange={e => setTestData(e.target.value)}
+                className="font-mono text-xs"
+              />
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTestModal(false)}>Cancelar</Button>
+            <Button onClick={handleSendTest} className="gap-2">
+              <Send className="size-4" /> Enviar Teste Agora
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

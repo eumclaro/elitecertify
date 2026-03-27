@@ -29,6 +29,101 @@ router.get('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: 
   }
 });
 
+// GET /api/dispatches/exams-with-releases — Listar provas que têm liberações
+router.get('/exams-with-releases', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const exams = await prisma.exam.findMany({
+      where: {
+        releases: { some: {} }
+      },
+      select: {
+        id: true,
+        title: true,
+        releases: {
+          select: {
+            id: true,
+            classId: true,
+            studentId: true,
+            releasedAt: true,
+            class: { select: { name: true } }
+          }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    return res.json(exams);
+  } catch (error) {
+    console.error('Exams with releases error:', error);
+    return res.status(500).json({ error: 'Erro ao buscar provas com liberações' });
+  }
+});
+
+// POST /api/dispatches/recipients/resolve — Resolver lista de destinatários por filtro
+router.post('/recipients/resolve', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const { type, classId, examId, releaseId } = req.body;
+
+    if (type === 'NOT_ATTEMPTED') {
+      if (!classId || !examId) return res.status(400).json({ error: 'Turma e Prova são obrigatórios' });
+
+      const students = await prisma.student.findMany({
+        where: {
+          classes: { some: { classId } },
+          examAttempts: {
+            none: { examId }
+          }
+        },
+        include: {
+          user: { select: { name: true, email: true } }
+        }
+      });
+
+      return res.json({ students });
+    }
+
+    if (type === 'RELEASE_SPECIFIC') {
+      if (!releaseId) return res.status(400).json({ error: 'ID da liberação é obrigatório' });
+
+      const release = await prisma.examRelease.findUnique({
+        where: { id: releaseId },
+        include: {
+          class: {
+            include: {
+              students: {
+                include: {
+                  student: {
+                    include: { user: { select: { name: true, email: true } } }
+                  }
+                }
+              }
+            }
+          },
+          student: {
+            include: { user: { select: { name: true, email: true } } }
+          }
+        }
+      });
+
+      if (!release) return res.status(404).json({ error: 'Liberação não encontrada' });
+
+      let studentList: any[] = [];
+      if (release.class) {
+        studentList = release.class.students.map(cs => cs.student);
+      } else if (release.student) {
+        studentList = [release.student];
+      }
+
+      return res.json({ students: studentList });
+    }
+
+    return res.status(400).json({ error: 'Tipo de filtro inválido' });
+  } catch (error) {
+    console.error('Resolve recipients error:', error);
+    return res.status(500).json({ error: 'Erro ao resolver destinatários' });
+  }
+});
+
 // POST /api/dispatches — Criar novo disparo em lote
 router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {

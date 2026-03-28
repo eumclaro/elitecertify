@@ -152,13 +152,13 @@ model ExamAttempt {
   startedAt       DateTime               @default(now()) @map("started_at")
   finishedAt      DateTime?              @map("finished_at")
   score           Float?
-  correctAnswers  Int?                   @map("correct_answers")
-  totalQuestions  Int?                   @map("total_questions")
   ip              String?
   device          String?
   createdAt       DateTime               @default(now()) @map("created_at")
   executionStatus AttemptExecutionStatus @default(IN_PROGRESS) @map("execution_status")
   resultStatus    AttemptResultStatus    @default(PENDING) @map("result_status")
+  correctAnswers  Int?                   @map("correct_answers")
+  totalQuestions  Int?                   @map("total_questions")
   answers         Answer[]
   certificate     Certificate?
   exam            Exam                   @relation(fields: [examId], references: [id], onDelete: Cascade)
@@ -348,34 +348,50 @@ model EmailTemplate {
   lastSyncedAt     DateTime?           @map("last_synced_at")
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
+  htmlContent      String?             @map("html_content")
   bindings         EmailEventBinding[]
 
   @@map("email_templates")
 }
 
+model InternalTemplate {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  htmlContent String?             @map("html_content")
+  mergeVars   Json?               @map("merge_vars")
+  status      String              @default("DRAFT")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  bindings    EmailEventBinding[]
+
+  @@map("internal_templates")
+}
+
 model EmailEventBinding {
-  id                 String        @id @default(uuid())
-  eventKey           String        @unique
-  templateId         String        @map("template_id")
-  isActive           Boolean       @default(true) @map("is_active")
-  fallbackTemplateId String?       @map("fallback_template_id")
-  createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime      @updatedAt @map("updated_at")
-  template           EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id                 String            @id @default(uuid())
+  eventKey           String            @unique
+  templateId         String?           @map("template_id")
+  isActive           Boolean           @default(true) @map("is_active")
+  fallbackTemplateId String?           @map("fallback_template_id")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  internalTemplateId String?           @map("internal_template_id")
+  internalTemplate   InternalTemplate? @relation(fields: [internalTemplateId], references: [id])
+  template           EmailTemplate?    @relation(fields: [templateId], references: [id])
 
   @@map("email_event_bindings")
 }
 
-
 model Dispatch {
-  id           String   @id @default(uuid())
-  templateSlug String   @map("template_slug")
-  recipientGroup String? @map("recipient_group")
-  totalSent    Int      @default(0) @map("total_sent")
-  totalFailed  Int      @default(0) @map("total_failed")
-  failedEmails Json?    @map("failed_emails") // Array of objects { email, error }
-  createdAt    DateTime @default(now()) @map("created_at")
-  logs         EmailLog[]
+  id             String     @id @default(uuid())
+  templateSlug   String     @map("template_slug")
+  recipientGroup String?    @map("recipient_group")
+  totalSent      Int        @default(0) @map("total_sent")
+  totalFailed    Int        @default(0) @map("total_failed")
+  failedEmails   Json?      @map("failed_emails")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  logs           EmailLog[]
 
   @@map("dispatches")
 }

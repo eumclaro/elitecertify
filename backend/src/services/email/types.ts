@@ -9,6 +9,7 @@ export interface SendTemplateOptions {
   dynamicData: Record<string, any>;
   fromEmail?: string;
   fromName?: string;
+  htmlContent?: string;
 }
 
 export interface IEmailProvider {
@@ -18,9 +19,9 @@ export interface IEmailProvider {
   init(): void;
 
   /**
-   * Dispatches the analytical mapping request to the provider.
+   * Sends an email with HTML content.
    */
-  sendTemplate(options: SendTemplateOptions): Promise<string>;
+  send(options: SendTemplateOptions): Promise<string>;
 
   /**
    * Fetches the template list from the provider.

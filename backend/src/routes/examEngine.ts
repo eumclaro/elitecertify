@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { getClientInfo } from '../middleware/audit';
-import { sendExamPassedEmail, sendExamFailedEmail } from '../services/mail';
+import { sendExamPassedEmail, sendExamFailedEmail, sendExamAbandonedEmail } from '../services/mail';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -143,7 +143,13 @@ router.post('/answer', authMiddleware, async (req: Request, res: Response) => {
             data: { studentId: attempt.studentId, examId: attempt.examId, endsAt, status: 'ACTIVE' },
           });
         }
-        
+
+        prisma.student.findUnique({ where: { id: attempt.studentId }, include: { user: true } })
+          .then(s => {
+            if (s) sendExamAbandonedEmail(s.user.name, s.user.email, exam.title, s.lastName || '')
+              .catch(err => console.error('[MAIL] Abandoned-Timeout Error:', err));
+          });
+
         return res.status(400).json({ error: 'Tempo esgotado. Prova encerrada.', expired: true });
       }
     }
@@ -269,7 +275,8 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
         correctAnswers,
         totalQuestions,
         endsAt || undefined,
-        att.student.lastName || ''
+        att.student.lastName || '',
+        attempt.id
       ).catch((err) => console.error('[MAIL] Fail-Mail Error:', err));
     }
 
@@ -322,6 +329,12 @@ router.post('/abandon/:attemptId', authMiddleware, async (req: Request, res: Res
     await prisma.auditEvent.create({
       data: { userId: req.user!.userId, action: 'EXAM_ABANDONED', entity: 'ExamAttempt', entityId: attemptId, ip, device, metadata: JSON.stringify({ reason }) },
     });
+
+    prisma.student.findUnique({ where: { id: attempt.studentId }, include: { user: true } })
+      .then(s => {
+        if (s) sendExamAbandonedEmail(s.user.name, s.user.email, attempt.exam.title, s.lastName || '')
+          .catch(err => console.error('[MAIL] Abandoned-Voluntary Error:', err));
+      });
 
     return res.json({ message: 'Prova abandonada' });
   } catch (error: any) {

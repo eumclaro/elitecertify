@@ -181,11 +181,15 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 
       const promises = students.map(async (student) => {
         try {
+          // NAME, LAST_NAME e EMAIL são sempre injetados do banco por destinatário.
+          // Variáveis específicas de prova (EXAM_NAME, SCORE, CORRETAS, ERRADAS,
+          // TOTAL_QUESTOES, COOLDOWN_DATE, COOLDOWN_TIME, RESULT_LINK, etc.)
+          // devem ser enviadas pelo frontend no campo `variables` do body do disparo.
           const dynamicData: any = {
             NAME: student.user.name,
-            'LAST-NAME': student.lastName || '',
+            LAST_NAME: student.lastName || '',
             EMAIL: student.user.email,
-            ...variables 
+            ...variables
           };
 
           // Decidir o eventKey com base no eventSlug do template

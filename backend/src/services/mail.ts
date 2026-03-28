@@ -153,44 +153,41 @@ export async function dispatchTemplateToMandrill(
     // 1. Tentar buscar vínculo dinâmico no banco de dados
     const binding = await prisma.emailEventBinding.findUnique({
       where: { eventKey },
-      include: { template: true }
+      include: { internalTemplate: true, template: true }
     });
 
-    let finalSlug: string | undefined = undefined;
+    let internalHtml: string | undefined = undefined;
+    let templateNameUsed: string = 'Internal';
 
-    if (binding && binding.isActive && binding.template) {
-      finalSlug = binding.template.slug;
-      console.log(`[Mail] Using dynamic binding for ${eventKey}: ${finalSlug}`);
+    if (binding && binding.isActive && binding.internalTemplate && binding.internalTemplate.status === 'ACTIVE') {
+      internalHtml = binding.internalTemplate.htmlContent || undefined;
+      templateNameUsed = binding.internalTemplate.name;
+      console.log(`[Mail] Using internal template for ${eventKey}: ${templateNameUsed}`);
     } else {
-      // Fallback para o mapeamento estático legado
-      finalSlug = EMAIL_MAPPINGS[eventKey];
-      console.log(`[Mail] No active binding found for ${eventKey}. Falling back to static: ${finalSlug}`);
-    }
-
-    if (!finalSlug) {
-      throw new Error(`Nenhum template (DB ou Estático) localizado para o evento: ${eventKey}`);
+      // Se não houver template interno ativo, retornamos erro conforme solicitado
+      throw new Error(`Nenhum template interno ativo vinculado ao evento ${eventKey}`);
     }
 
     // 2. Buscar remetente autorizado do sistema
     const { fromEmail, fromName } = await getAuthorizedSender();
 
-    // 3. Disparar via Provider
-    const msgId = await provider.sendTemplate({
+    // 3. Disparar via Provider (Mandrill as Transporter only)
+    const msgId = await provider.send({
       toEmail,
       toName,
       eventKey,
-      templateSlug: finalSlug,
-      subject,
+      subject: subject || '(Sem assunto)',
       dynamicData,
       fromEmail,
-      fromName
+      fromName,
+      htmlContent: internalHtml
     });
 
     // 3. Registrar Log Robusto
     await prisma.emailLog.create({
       data: {
         eventKey,
-        templateUsed: finalSlug,
+        templateUsed: templateNameUsed,
         recipient: toEmail,
         subject: subject || '(Sem assunto)',
         payloadJson: JSON.stringify(dynamicData),
@@ -231,7 +228,7 @@ export async function dispatchTemplateToMandrill(
 export async function sendWelcomeEmail(name: string, email: string, rawPassword?: string, lastName: string = '') {
   return dispatchTemplateToMandrill('STUDENT_CREATED', email, name, {
     NAME: name,
-    'LAST-NAME': lastName,
+    LAST_NAME: lastName,
     EMAIL: email,
     PASSWORD: rawPassword || '',
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
@@ -241,7 +238,7 @@ export async function sendWelcomeEmail(name: string, email: string, rawPassword?
 export async function sendPasswordResetEmail(name: string, email: string, resetLink: string, lastName: string = '') {
   return dispatchTemplateToMandrill('AUTH_PASSWORD_RESET', email, name, {
     NAME: name,
-    'LAST-NAME': lastName,
+    LAST_NAME: lastName,
     EMAIL: email,
     RESET_LINK: resetLink,
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
@@ -251,7 +248,7 @@ export async function sendPasswordResetEmail(name: string, email: string, resetL
 export async function sendExamReleasedEmail(name: string, email: string, examName: string, lastName: string = '') {
   return dispatchTemplateToMandrill('EXAM_RELEASED', email, name, {
     NAME: name,
-    'LAST-NAME': lastName,
+    LAST_NAME: lastName,
     EMAIL: email,
     EXAM_NAME: examName,
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
@@ -270,13 +267,14 @@ export async function sendExamPassedEmail(
 ) {
   return dispatchTemplateToMandrill('EXAM_PASSED', email, name, {
     NAME: name,
-    'LAST-NAME': lastName,
+    LAST_NAME: lastName,
     EMAIL: email,
     EXAM_NAME: examName,
     SCORE: `${score}%`,
     CORRETAS: correctAnswers,
     ERRADAS: totalQuestions - correctAnswers,
     TOTAL_QUESTOES: totalQuestions,
+    STATUS: 'APROVADO',
     CERTIFICATE_LINK: certificateUrl || '',
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
   });
@@ -290,19 +288,33 @@ export async function sendExamFailedEmail(
   correctAnswers: number,
   totalQuestions: number,
   cooldownEndDate?: Date, 
-  lastName: string = ''
+  lastName: string = '',
+  attemptId: string = ''
 ) {
   return dispatchTemplateToMandrill('EXAM_FAILED', email, name, {
     NAME: name,
-    'LAST-NAME': lastName,
+    LAST_NAME: lastName,
     EMAIL: email,
     EXAM_NAME: examName,
     SCORE: `${score}%`,
     CORRETAS: correctAnswers,
     ERRADAS: totalQuestions - correctAnswers,
     TOTAL_QUESTOES: totalQuestions,
+    STATUS: 'REPROVADO',
     COOLDOWN_DATE: cooldownEndDate ? cooldownEndDate.toLocaleDateString('pt-BR') : '',
-    COOLDOWN_TIME: cooldownEndDate ? cooldownEndDate.toLocaleTimeString('pt-BR') : '',
+    COOLDOWN_TIME: cooldownEndDate ? cooldownEndDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+    RESULT_LINK: attemptId ? `${process.env.FRONTEND_URL}/student/result/${attemptId}` : '',
+    SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
+  });
+}
+
+export async function sendExamAbandonedEmail(name: string, email: string, examName: string, lastName: string = '') {
+  return dispatchTemplateToMandrill('EXAM_ABANDONED', email, name, {
+    NAME: name,
+    LAST_NAME: lastName,
+    EMAIL: email,
+    EXAM_NAME: examName,
+    STATUS: 'DESCLASSIFICADO',
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
   });
 }
@@ -310,7 +322,7 @@ export async function sendExamFailedEmail(
 export async function sendCooldownReleasedEmail(name: string, email: string, examName: string, lastName: string = '') {
   return dispatchTemplateToMandrill('COOLDOWN_RELEASED', email, name, {
     NAME: name,
-    'LAST-NAME': lastName,
+    LAST_NAME: lastName,
     EMAIL: email,
     EXAM_NAME: examName,
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'

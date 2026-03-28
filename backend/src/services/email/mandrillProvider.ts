@@ -18,50 +18,41 @@ export class MandrillProvider implements IEmailProvider {
     console.log('[MandrillProvider] Initialized successfully.');
   }
 
-  async sendTemplate(options: SendTemplateOptions): Promise<string> {
+  async send(options: SendTemplateOptions): Promise<string> {
     if (!this.client) {
       throw new Error('MandrillProvider is not initialized. Check MANDRILL_API_KEY.');
     }
 
-    const templateName = options.templateSlug || (options.eventKey ? EMAIL_MAPPINGS[options.eventKey] : undefined);
-    if (!templateName) {
-      throw new Error(`No Mandrill template mapped and no slug provided.`);
+    if (!options.htmlContent) {
+      throw new Error('Internal templates migration requires HTML content to be provided.');
     }
 
-    const globalMergeVars = Object.entries(options.dynamicData).map(([name, content]) => ({
-      name: name.toUpperCase(),
-      content: String(content),
-    }));
+    console.log(`[MandrillProvider] Sending HTML for event: ${options.eventKey}`);
+    
+    let renderedHtml = options.htmlContent;
+    // Substituição simples de {{VAR}} pelos valores de dynamicData
+    Object.entries(options.dynamicData).forEach(([key, value]) => {
+      const regex = new RegExp(`{{${key}}}`, 'g');
+      renderedHtml = renderedHtml.replace(regex, String(value));
+    });
 
     const message: any = {
       to: [{ email: options.toEmail, name: options.toName, type: 'to' }],
-      global_merge_vars: globalMergeVars,
+      html: renderedHtml,
+      subject: options.subject || 'Notificação - ELT Training',
+      merge_language: 'mailchimp',
     };
 
-    if (options.fromEmail) {
-      message.from_email = options.fromEmail;
-    }
-    if (options.fromName) {
-      message.from_name = options.fromName;
-    }
-
-    if (options.subject) {
-      message.subject = options.subject;
-    }
+    if (options.fromEmail) message.from_email = options.fromEmail;
+    if (options.fromName) message.from_name = options.fromName;
 
     try {
-      const response = await this.client.messages.sendTemplate({
-        template_name: templateName,
-        template_content: [],
-        message,
-      });
-
+      const response = await this.client.messages.send({ message });
       const result = Array.isArray(response) ? response[0] : response;
       
       if (result.status === 'rejected' || result.status === 'invalid') {
-        throw new Error(`Mandrill rejected the message: ${result.reject_reason || 'Unknown reason'}`);
+        throw new Error(`Mandrill rejected: ${result.reject_reason || 'Unknown'}`);
       }
-
       return result._id;
     } catch (error: any) {
       const errMessage = error?.response?.data?.message || error.message || 'Unknown Mandrill SDK error';
@@ -69,45 +60,8 @@ export class MandrillProvider implements IEmailProvider {
     }
   }
 
-  async listTemplates(): Promise<any[]> {
-    if (!this.client) return [];
-    try {
-      const response = await this.client.templates.list();
-      return response || [];
-    } catch (error: any) {
-      console.error('[MandrillProvider] listTemplates Error:', error.message);
-      throw error;
-    }
-  }
-
-  async getTemplateInfo(slug: string): Promise<any> {
-    if (!this.client) throw new Error('Not initialized');
-    try {
-      return await this.client.templates.info({ name: slug });
-    } catch (error: any) {
-      console.error(`[MandrillProvider] getTemplateInfo Error for ${slug}:`, error.message);
-      throw error;
-    }
-  }
-
-  async renderTemplate(slug: string, mergeVars: Record<string, any>): Promise<string> {
-    if (!this.client) throw new Error('Not initialized');
-    try {
-      const vars = Object.entries(mergeVars).map(([name, content]) => ({
-        name: name.toUpperCase(),
-        content: String(content),
-      }));
-
-      const response = await this.client.templates.render({
-        template_name: slug,
-        template_content: [],
-        merge_vars: vars
-      });
-
-      return response.html;
-    } catch (error: any) {
-      console.error(`[MandrillProvider] renderTemplate Error for ${slug}:`, error.message);
-      throw error;
-    }
-  }
+  // Métodos depreciados ou removidos conforme solicitado
+  async listTemplates(): Promise<any[]> { return []; }
+  async getTemplateInfo(_slug: string): Promise<any> { throw new Error('Action removed'); }
+  async renderTemplate(_slug: string, _vars: any): Promise<string> { throw new Error('Action removed'); }
 }

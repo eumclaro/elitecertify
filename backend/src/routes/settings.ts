@@ -110,19 +110,20 @@ router.post('/mandrill/test', authMiddleware, requireRole('ADMIN'), async (req: 
 
     const provider = getEmailProvider();
     
-    // We'll try to send a "Student Created" template as a test
+    // We'll try to send a simple HTML test
     const dummyAt = new Date().toLocaleDateString('pt-BR');
-    await provider.sendTemplate({
+    await provider.send({
       toEmail: user.email,
       toName: user.name,
-      eventKey: 'STUDENT_CREATED', // Using a generic one for test
+      eventKey: 'STUDENT_CREATED', 
       subject: `Teste de Conexão Mandrill - ${dummyAt}`,
       dynamicData: {
         NAME: user.name,
         EMAIL: user.email,
         PASSWORD: '----',
         SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
-      }
+      },
+      htmlContent: `<h1>Teste de Conexão</h1><p>Olá ${user.name}, o seu servidor SMTP (Mandrill) está funcionando corretamente via ELT CERT.</p><p>Data: ${dummyAt}</p>`
     });
 
     return res.json({ message: 'Conexão com Mandrill validada! Template de boas-vindas enviado para seu e-mail.' });

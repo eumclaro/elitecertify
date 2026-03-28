@@ -33,8 +33,22 @@ export const MANDRILL_TEMPLATES: Record<string, EmailTemplateConfig> = {
     slug: 'exam-result',
     name: 'Resultado de Prova',
     description: 'Resultado da prova (Aprovado/Reprovado)',
-    mergeVars: ['NAME', 'EXAM_NAME', 'SCORE', 'CORRETAS', 'ERRADAS', 'TOTAL_QUESTOES', 'STATUS'],
+    mergeVars: ['NAME', 'EXAM_NAME', 'SCORE', 'CORRETAS', 'ERRADAS', 'TOTAL_QUESTOES', 'STATUS', 'RESULT_LINK'],
     eventSlug: ['EXAM_PASSED', 'EXAM_FAILED']
+  },
+  'exam-failed': {
+    slug: 'exam-failed',
+    name: 'Reprovado por Nota',
+    description: 'Enviado para alunos reprovados por pontuação',
+    mergeVars: ['NAME', 'EXAM_NAME', 'SCORE', 'CORRETAS', 'ERRADAS', 'TOTAL_QUESTOES', 'COOLDOWN_DATE', 'COOLDOWN_TIME', 'RESULT_LINK'],
+    eventSlug: 'EXAM_FAILED'
+  },
+  'exam-abandoned': {
+    slug: 'exam-abandoned',
+    name: 'Desclassificado',
+    description: 'Enviado para alunos que abandonaram a prova',
+    mergeVars: ['NAME', 'EXAM_NAME'],
+    eventSlug: 'EXAM_ABANDONED'
   },
   'cooldown-released': {
     slug: 'exam-cooldown-released',

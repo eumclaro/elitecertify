@@ -4,6 +4,7 @@ export const EMAIL_MAPPINGS = {
   EXAM_RELEASED: 'exam-released',
   EXAM_PASSED: 'exam-passed',
   EXAM_FAILED: 'exam-failed',
+  EXAM_ABANDONED: 'exam-abandoned',
   EXAM_FAILED_COOLDOWN: 'exam-cooldown-alert',
   COOLDOWN_RELEASED: 'exam-cooldown-released',
   // Fase 2

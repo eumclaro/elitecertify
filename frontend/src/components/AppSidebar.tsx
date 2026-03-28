@@ -44,7 +44,7 @@ const adminLinks = [
   { path: '/admin/reports', label: 'Relatórios', icon: ClipboardList },
   { path: '/admin/audit', label: 'Auditoria', icon: Lock },
   { path: '/admin/smtp', label: 'Settings', icon: Settings },
-  { path: '/admin/emails', label: 'E-mails Log', icon: Mail },
+  { path: '/admin/emails', label: 'Templates de E-mail', icon: Mail },
   { path: '/admin/dispatches', label: 'Disparos', icon: Send },
 ];
 

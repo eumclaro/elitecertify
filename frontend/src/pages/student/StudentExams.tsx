@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { AlertTriangle, Clock, FileText, Target, RefreshCw, CheckCircle2, Hourglass, XCircle, Rocket, Play, BarChart2 } from 'lucide-react';
 
 interface ExamItem {
   id: string;
@@ -31,18 +43,16 @@ export default function StudentExams() {
       .then(r => {
         const fetchedExams = r.data;
         const abandonedAttemptId = localStorage.getItem('elt-cert-abandoned-attempt');
-        
+
         if (abandonedAttemptId) {
           let flagCleared = false;
           fetchedExams.forEach((exam: any) => {
             if (exam.lastAttempt?.id === abandonedAttemptId) {
               if (exam.inProgress || exam.frontendStatus === 'IN_PROGRESS' || exam.lastAttempt.executionStatus === 'IN_PROGRESS') {
-                // Força o encerramento no Frontend se o Backend estiver atrasado
                 exam.inProgress = false;
-                exam.frontendStatus = 'EXHAUSTED'; 
+                exam.frontendStatus = 'EXHAUSTED';
                 exam.lastAttempt.executionStatus = 'ABANDONED';
                 exam.lastAttempt.resultStatus = 'FAILED_ABANDONMENT';
-                // Presume cooldown genérico até limpar
                 exam.hasCooldown = true;
                 exam.cooldownEndsAt = new Date(Date.now() + 86400000).toISOString();
               } else {
@@ -52,7 +62,7 @@ export default function StudentExams() {
           });
           if (flagCleared) localStorage.removeItem('elt-cert-abandoned-attempt');
         }
-        
+
         setExams(fetchedExams);
       })
       .catch(console.error)
@@ -72,109 +82,155 @@ export default function StudentExams() {
     }
   };
 
-  if (loading) return <div className="page-loading"><div className="spinner"></div></div>;
-
-  return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h2>Minhas Provas</h2>
-          <p>Provas disponíveis para você</p>
+  if (loading) {
+    return (
+      <div className="p-6 space-y-4">
+        <div className="space-y-1">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-56 rounded-xl" />
+          ))}
         </div>
       </div>
+    );
+  }
 
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Minhas Provas</h2>
+        <p className="text-muted-foreground">Provas disponíveis para você</p>
+      </div>
+
+      {/* Empty state */}
       {exams.length === 0 ? (
-        <div className="empty-card">Nenhuma prova disponível no momento</div>
+        <Card className="flex items-center justify-center py-16">
+          <CardContent className="text-center text-muted-foreground pt-6">
+            <FileText className="mx-auto mb-3 size-10 opacity-40" />
+            <p>Nenhuma prova disponível no momento</p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="exams-grid">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {exams.map(exam => (
-            <div key={exam.id} className="exam-card-student">
-              <div className="exam-card-header">
-                <h3>{exam.title}</h3>
-                {exam.class && <span className="badge badge-secondary">{exam.class.name}</span>}
-              </div>
+            <Card key={exam.id} className="flex flex-col">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-base leading-snug">{exam.title}</CardTitle>
+                  {exam.class && (
+                    <Badge variant="secondary" className="shrink-0 text-xs">{exam.class.name}</Badge>
+                  )}
+                </div>
+              </CardHeader>
 
-              <div className="exam-card-info">
-                <div className="exam-info-item">
-                  <span className="info-label">⏱️ Duração</span>
-                  <span className="info-value">{exam.durationMinutes} min</span>
+              <CardContent className="pb-3 flex-1">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Clock className="size-3.5" />
+                    <span className="font-medium text-foreground">{exam.durationMinutes} min</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <FileText className="size-3.5" />
+                    <span className="font-medium text-foreground">{exam.questionCount} questões</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Target className="size-3.5" />
+                    <span className="font-medium text-foreground">{exam.passingScore}% mínimo</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <RefreshCw className="size-3.5" />
+                    <span className="font-medium text-foreground">
+                      {exam.attempts}{exam.maxAttempts > 0 ? `/${exam.maxAttempts}` : ' (Ilimitadas)'}
+                    </span>
+                  </div>
                 </div>
-                <div className="exam-info-item">
-                  <span className="info-label">📝 Questões</span>
-                  <span className="info-value">{exam.questionCount}</span>
-                </div>
-                <div className="exam-info-item">
-                  <span className="info-label">🎯 Mínimo</span>
-                  <span className="info-value">{exam.passingScore}%</span>
-                </div>
-                <div className="exam-info-item">
-                  <span className="info-label">🔄 Tentativas</span>
-                  <span className="info-value">{exam.attempts}{exam.maxAttempts > 0 ? `/${exam.maxAttempts}` : ' (Ilimitadas)'}</span>
-                </div>
-              </div>
+              </CardContent>
 
-              <div className="exam-card-footer">
+              <CardFooter className="flex flex-col gap-2 pt-0">
                 {exam.hasCertificate ? (
-                  <div className="exam-status-bar success">
-                    <span>✅ Aprovado — Certificado: {exam.certificateCode}</span>
+                  <div className="w-full flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
+                    <CheckCircle2 className="size-4 shrink-0" />
+                    <span className="font-medium">Aprovado — {exam.certificateCode}</span>
                   </div>
                 ) : exam.hasCooldown ? (
-                  <div className="exam-status-bar warning">
-                    <span>⏳ Cooldown até {new Date(exam.cooldownEndsAt!).toLocaleString('pt-BR')}</span>
+                  <div className="w-full flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-700">
+                    <Hourglass className="size-4 shrink-0" />
+                    <span>Cooldown até {new Date(exam.cooldownEndsAt!).toLocaleString('pt-BR')}</span>
                   </div>
                 ) : (exam.maxAttempts > 0 && exam.attempts >= exam.maxAttempts) ? (
-                  <div className="exam-status-bar danger">
-                    <span>❌ Tentativas esgotadas</span>
+                  <div className="w-full flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                    <XCircle className="size-4 shrink-0" />
+                    <span className="font-medium">Tentativas esgotadas</span>
                   </div>
                 ) : (
-                  <button className="btn btn-primary btn-full" onClick={() => setConfirmStart(exam.id)}>
-                    {exam.inProgress ? '▶ Continuar Prova' : '🚀 Iniciar Prova'}
-                  </button>
+                  <Button className="w-full" onClick={() => setConfirmStart(exam.id)}>
+                    {exam.inProgress
+                      ? <><Play className="size-4 mr-2" /> Continuar Prova</>
+                      : <><Rocket className="size-4 mr-2" /> Iniciar Prova</>
+                    }
+                  </Button>
                 )}
 
                 {exam.lastAttempt && exam.lastAttempt.executionStatus !== 'IN_PROGRESS' && (
-                  <button className="btn btn-outline btn-sm" style={{marginTop: 8, width:'100%'}} onClick={() => navigate(`/student/result/${exam.lastAttempt.id}`)}>
-                    📊 Ver Último Resultado {exam.lastAttempt.resultStatus === 'FAILED_ABANDONMENT' ? '(Desclassificado)' : exam.lastAttempt.resultStatus === 'FAILED_TIMEOUT' ? '(Tempo Esgotado)' : `(${exam.lastAttempt.score}%)`}
-                  </button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => navigate(`/student/result/${exam.lastAttempt.id}`)}
+                  >
+                    <BarChart2 className="size-4 mr-2" />
+                    Ver Último Resultado{' '}
+                    {exam.lastAttempt.resultStatus === 'FAILED_ABANDONMENT'
+                      ? '(Desclassificado)'
+                      : exam.lastAttempt.resultStatus === 'FAILED_TIMEOUT'
+                      ? '(Tempo Esgotado)'
+                      : `(${exam.lastAttempt.score}%)`}
+                  </Button>
                 )}
-              </div>
-            </div>
+              </CardFooter>
+            </Card>
           ))}
         </div>
       )}
 
-      {/* Pre-Exam Warning Modal */}
-      {confirmStart && (
-        <div className="modal-overlay" onClick={() => !starting && setConfirmStart(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <div className="modal-header">
-              <h3>Atenção: Regras da Prova</h3>
-              <button className="modal-close" onClick={() => !starting && setConfirmStart(null)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div className="alert alert-warning" style={{ marginBottom: '1rem', backgroundColor: '#fff3cd', color: '#856404', padding: '1rem', borderRadius: '8px', border: '1px solid #ffeeba' }}>
-                <strong>⚠️ LEIA COM ATENÇÃO ANTES DE INICIAR</strong>
-                <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem', fontSize: '0.9rem' }}>
+      {/* Pre-Exam Warning Dialog */}
+      <Dialog open={!!confirmStart} onOpenChange={(open) => { if (!open && !starting) setConfirmStart(null); }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Atenção: Regras da Prova</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <AlertTriangle className="size-5 shrink-0 text-amber-600 mt-0.5" />
+              <div className="text-sm text-amber-800 space-y-1">
+                <p className="font-semibold">⚠️ LEIA COM ATENÇÃO ANTES DE INICIAR</p>
+                <ul className="list-disc pl-4 space-y-0.5">
                   <li>Você não pode fechar esta aba ou janela.</li>
                   <li>Você não pode usar o botão "Voltar" do navegador.</li>
                 </ul>
               </div>
-              <p>
-                Qualquer violação das regras acima fará com que sua prova seja <strong>encerrada imediatamente e contabilizada como desclassificada/abandonada</strong>.
-              </p>
-              <div className="modal-footer" style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-                <button className="btn btn-secondary" onClick={() => setConfirmStart(null)} disabled={starting}>
-                  Cancelar
-                </button>
-                <button className="btn btn-primary" onClick={startExam} disabled={starting}>
-                  {starting ? 'Preparando...' : 'Estou ciente, Iniciar Prova'}
-                </button>
-              </div>
             </div>
+            <p className="text-sm text-muted-foreground">
+              Qualquer violação das regras acima fará com que sua prova seja{' '}
+              <strong className="text-foreground">encerrada imediatamente e contabilizada como desclassificada/abandonada</strong>.
+            </p>
           </div>
-        </div>
-      )}
 
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmStart(null)} disabled={starting}>
+              Cancelar
+            </Button>
+            <Button onClick={startExam} disabled={starting}>
+              {starting ? 'Preparando...' : 'Estou ciente, Iniciar Prova'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

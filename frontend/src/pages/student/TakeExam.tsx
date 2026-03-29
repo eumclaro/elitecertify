@@ -2,6 +2,19 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { ChevronLeft, ChevronRight, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 let examIsMounted = false;
 let abandonTimeout: any = null;
@@ -20,7 +33,6 @@ export default function TakeExam() {
   const [confirmSubmit, setConfirmSubmit] = useState<number | null>(null);
   const [violation, setViolation] = useState<string | null>(null);
 
-  // Use refs to avoid triggering useEffect cleanup on state changes
   const submittingRef = useRef(false);
   const abandonedRef = useRef(false);
 
@@ -29,10 +41,10 @@ export default function TakeExam() {
   const triggerAbandon = useCallback(async (reason: string) => {
     if (abandonedRef.current || submittingRef.current || !examData) return;
     abandonedRef.current = true;
-    
+
     // OPTIMISTIC UI: Mask the attempt locally to defeat SPA race conditions
     localStorage.setItem('elt-cert-abandoned-attempt', examData.attempt.id);
-    
+
     try {
       const token = localStorage.getItem('elt-cert-token');
       await fetch(`/api/exam-engine/abandon/${examData.attempt.id}`, {
@@ -42,7 +54,7 @@ export default function TakeExam() {
         keepalive: true
       });
     } catch (err) {}
-    
+
     setViolation(reason);
   }, [examData]);
 
@@ -50,7 +62,6 @@ export default function TakeExam() {
   useEffect(() => {
     if (!examData) return;
 
-    // Fast-mount verification (Strict Mode)
     examIsMounted = true;
     if (abandonTimeout) {
       clearTimeout(abandonTimeout);
@@ -64,8 +75,7 @@ export default function TakeExam() {
         e.returnValue = '';
       }
     };
-    
-    // Trap the back button
+
     window.history.pushState(null, '', window.location.href);
     const handlePopState = () => {
       window.history.pushState(null, '', window.location.href);
@@ -79,9 +89,8 @@ export default function TakeExam() {
     document.addEventListener('contextmenu', preventDefault);
     document.addEventListener('copy', preventDefault);
     document.addEventListener('paste', preventDefault);
-    
+
     return () => {
-      // Unmount tracking (for external link clicks / hard unmounts)
       examIsMounted = false;
       abandonTimeout = setTimeout(() => {
         if (!examIsMounted && !submittingRef.current && !abandonedRef.current) {
@@ -176,153 +185,220 @@ export default function TakeExam() {
     }
   };
 
-  if (!examData) return <div className="page-loading"><div className="spinner"></div></div>;
+  if (!examData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Skeleton className="h-10 w-48" />
+      </div>
+    );
+  }
 
   const questions = examData.questions || [];
   const question = questions[currentQuestion];
-  const isUrgent = timeLeft < 300; // less than 5 min
+  const isUrgent = timeLeft < 300;
+  const totalSeconds = examData.exam.durationMinutes * 60;
+  const progressPct = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
+  const answeredCount = Object.keys(answers).length;
 
   return (
-    <div className="take-exam" style={{ position: 'relative' }}>
-      {/* Watermark */}
-      <div className="watermark-overlay">
-        {Array.from({ length: 40 }).map((_, i) => (
-          <div key={i} className="watermark-text">{user?.name} - {user?.email}</div>
-        ))}
+    <div className="relative min-h-screen bg-muted/30 select-none">
+
+      {/* Watermark Overlay */}
+      <div
+        className="pointer-events-none fixed inset-0 overflow-hidden opacity-[0.04] z-0"
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 flex flex-wrap content-start gap-x-16 gap-y-8 p-8 -rotate-[30deg] scale-150 origin-center">
+          {Array.from({ length: 40 }).map((_, i) => (
+            <span key={i} className="text-sm font-semibold whitespace-nowrap text-foreground">
+              {user?.name} — {user?.email}
+            </span>
+          ))}
+        </div>
       </div>
 
-      {/* Header Bar */}
-      <div className="exam-top-bar" style={{ position: 'relative', zIndex: 10 }}>
-        <div className="exam-top-title">
-          <h2>{examData.exam.title}</h2>
-          <span className="exam-progress">Questão {currentQuestion + 1} de {questions.length}</span>
+      {/* Top Bar */}
+      <div className="sticky top-0 z-10 bg-background border-b shadow-sm px-4 py-3">
+        <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-sm truncate">{examData.exam.title}</h2>
+            <p className="text-xs text-muted-foreground">
+              Questão {currentQuestion + 1} de {questions.length} · {answeredCount} respondidas
+            </p>
+          </div>
+
+          <div className={cn(
+            'flex items-center gap-2 font-mono font-bold text-lg tabular-nums px-3 py-1 rounded-lg border',
+            isUrgent
+              ? 'text-red-600 bg-red-50 border-red-200 animate-pulse'
+              : 'text-foreground bg-muted border-border'
+          )}>
+            ⏱ {formatTime(timeLeft)}
+          </div>
         </div>
-        <div className={`exam-timer ${isUrgent ? 'urgent' : ''}`}>
-          ⏱️ {formatTime(timeLeft)}
+
+        {/* Timer Progress Bar */}
+        <div className="max-w-3xl mx-auto mt-2">
+          <Progress
+            value={progressPct}
+            className={cn('h-1.5', isUrgent && '[&>div]:bg-red-500')}
+          />
         </div>
       </div>
 
       {/* Question Navigator */}
-      <div className="question-nav-bar" style={{ position: 'relative', zIndex: 10 }}>
-        {questions.map((_: any, i: number) => (
-          <button
-            key={i}
-            className={`qnav-btn ${i === currentQuestion ? 'current' : ''} ${answers[questions[i].id] ? 'answered' : ''}`}
-            onClick={() => setCurrentQuestion(i)}
-          >
-            {i + 1}
-          </button>
-        ))}
+      <div className="max-w-3xl mx-auto px-4 pt-4">
+        <div className="flex flex-wrap gap-1.5">
+          {questions.map((_: any, i: number) => {
+            const isAnswered = !!answers[questions[i].id];
+            const isCurrent = i === currentQuestion;
+            return (
+              <button
+                key={i}
+                onClick={() => setCurrentQuestion(i)}
+                className={cn(
+                  'size-8 rounded-md text-xs font-semibold border transition-colors',
+                  isCurrent
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : isAnswered
+                    ? 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200'
+                    : 'bg-background text-muted-foreground border-border hover:bg-muted'
+                )}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Question Content */}
+      {/* Question Card */}
       {question && (
-        <div className="exam-question-card" style={{ position: 'relative', zIndex: 10, userSelect: 'none' }}>
-          <div className="exam-question-number">Questão {currentQuestion + 1}</div>
-          <div className="exam-question-text">{question.text}</div>
+        <div className="max-w-3xl mx-auto px-4 pt-4 pb-28">
+          <Card>
+            <CardContent className="pt-6 space-y-6">
+              <div>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Questão {currentQuestion + 1}
+                </span>
+                <p className="mt-2 text-base leading-relaxed font-medium">{question.text}</p>
+              </div>
 
-          <div className="exam-alternatives">
-            {question.alternatives.map((alt: any, idx: number) => {
-              const letter = String.fromCharCode(65 + idx);
-              const isSelected = answers[question.id] === alt.id;
-              return (
-                <button
-                  key={alt.id}
-                  className={`exam-alt-btn ${isSelected ? 'selected' : ''}`}
-                  onClick={() => selectAnswer(question.id, alt.id)}
-                >
-                  <span className={`exam-alt-letter ${isSelected ? 'selected' : ''}`}>{letter}</span>
-                  <span className="exam-alt-text">{alt.text}</span>
-                </button>
-              );
-            })}
-          </div>
+              <div className="space-y-2">
+                {question.alternatives.map((alt: any, idx: number) => {
+                  const letter = String.fromCharCode(65 + idx);
+                  const isSelected = answers[question.id] === alt.id;
+                  return (
+                    <button
+                      key={alt.id}
+                      onClick={() => selectAnswer(question.id, alt.id)}
+                      className={cn(
+                        'w-full flex items-start gap-3 rounded-lg border p-4 text-left text-sm transition-all',
+                        isSelected
+                          ? 'bg-primary/10 border-primary text-foreground font-medium'
+                          : 'bg-background border-border hover:bg-muted/60 text-foreground'
+                      )}
+                    >
+                      <span className={cn(
+                        'flex-shrink-0 size-6 rounded-full flex items-center justify-center text-xs font-bold border',
+                        isSelected
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-muted text-muted-foreground border-border'
+                      )}>
+                        {letter}
+                      </span>
+                      <span className="leading-snug pt-0.5">{alt.text}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {/* Navigation */}
-      <div className="exam-nav-footer" style={{ position: 'relative', zIndex: 10 }}>
-        <button
-          className="btn btn-secondary"
-          disabled={currentQuestion === 0}
-          onClick={() => setCurrentQuestion(prev => prev - 1)}
-        >
-          ← Anterior
-        </button>
+      {/* Footer Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 z-10 bg-background border-t px-4 py-3">
+        <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
+          <Button
+            variant="outline"
+            disabled={currentQuestion === 0}
+            onClick={() => setCurrentQuestion(prev => prev - 1)}
+          >
+            <ChevronLeft className="size-4 mr-1" /> Anterior
+          </Button>
 
-        {currentQuestion < questions.length - 1 ? (
-          <button
-            className="btn btn-primary"
-            onClick={() => setCurrentQuestion(prev => prev + 1)}
-          >
-            Próxima →
-          </button>
-        ) : (
-          <button
-            className="btn btn-primary"
-            disabled={submitting}
-            onClick={handleSubmit}
-          >
-            {submitting ? 'Enviando...' : '✅ Finalizar Prova'}
-          </button>
-        )}
+          {currentQuestion < questions.length - 1 ? (
+            <Button onClick={() => setCurrentQuestion(prev => prev + 1)}>
+              Próxima <ChevronRight className="size-4 ml-1" />
+            </Button>
+          ) : (
+            <Button
+              disabled={submitting}
+              onClick={handleSubmit}
+            >
+              <CheckCircle2 className="size-4 mr-2" />
+              {submitting ? 'Enviando...' : 'Finalizar Prova'}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Custom Confirm Modal for Missing Answers */}
-      {confirmSubmit !== null && (
-        <div className="modal-overlay" onClick={() => setConfirmSubmit(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <div className="modal-header">
-              <h3>Finalizar Prova</h3>
-              <button className="modal-close" onClick={() => setConfirmSubmit(null)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <p>Você tem <strong>{confirmSubmit} questão(ões) sem reposta</strong>.</p>
-              <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: '1rem', color: '#9ca3af' }}>
-                Tem certeza que deseja enviar sua prova mesmo assim? Essas questões serão consideradas erradas na sua nota final.
-              </p>
-              <div className="modal-footer" style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-                <button className="btn btn-secondary" onClick={() => setConfirmSubmit(null)} disabled={submitting}>
-                  Voltar para a prova
-                </button>
-                <button className="btn btn-primary" onClick={executeSubmit} disabled={submitting}>
-                  {submitting ? 'Enviando...' : 'Sim, Finalizar'}
-                </button>
-              </div>
-            </div>
+      {/* Confirm Submit Dialog (unanswered questions) */}
+      <Dialog open={confirmSubmit !== null} onOpenChange={(open) => { if (!open) setConfirmSubmit(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Finalizar Prova</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              Você tem <strong>{confirmSubmit} questão(ões) sem resposta</strong>.
+            </p>
+            <p className="text-muted-foreground">
+              Tem certeza que deseja enviar sua prova mesmo assim? Essas questões serão consideradas erradas na sua nota final.
+            </p>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSubmit(null)} disabled={submitting}>
+              Voltar para a prova
+            </Button>
+            <Button onClick={executeSubmit} disabled={submitting}>
+              {submitting ? 'Enviando...' : 'Sim, Finalizar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Security Violation Modal */}
-      {violation && (
-        <div className="modal-overlay" style={{ zIndex: 9999 }}>
-          <div className="modal" style={{ maxWidth: '450px', textAlign: 'center' }}>
-            <div className="modal-header" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0 }}>
-              <h3 style={{ color: 'var(--danger)', fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '2rem' }}>🚨</span> Violação de Segurança
-              </h3>
+      {/* Security Violation Modal (não fechável — sem onOpenChange) */}
+      <Dialog open={!!violation}>
+        <DialogContent
+          className="sm:max-w-[450px] text-center [&>button]:hidden"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-center gap-2 text-red-600 text-xl">
+              <ShieldAlert className="size-7" /> Violação de Segurança
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <p className="text-base">
+              A sua prova foi permanentemente <strong>encerrada e desclassificada</strong> de acordo com as regras de segurança do sistema.
+            </p>
+            <div className="rounded-lg bg-muted border px-4 py-3 font-mono text-xs text-muted-foreground">
+              <span className="block uppercase tracking-widest text-[10px] mb-1">Motivo do bloqueio</span>
+              <span className="text-foreground font-semibold">{violation}</span>
             </div>
-            <div className="modal-body">
-              <p style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#f3f4f6' }}>
-                A sua prova foi permanentemente <strong>encerrada e desclassificada</strong> de acordo com as regras de segurança do sistema.
-              </p>
-              <div style={{ backgroundColor: '#2d3748', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', display: 'inline-block', border: '1px solid #4a5568' }}>
-                <strong style={{ color: '#9ca3af', fontSize: '0.85rem', display: 'block', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Motivo do bloqueio</strong>
-                <span style={{ color: '#e2e8f0', fontFamily: 'monospace', fontSize: '1rem' }}>{violation}</span>
-              </div>
-              <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-                Tentativas de fechar a janela, usar o botão voltar do navegador ou clicar em links externos são estritamente proibidas durante a prova.
-              </p>
-              <div className="modal-footer" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
-                <button className="btn btn-primary" onClick={() => navigate('/student/exams')} style={{ width: '100%', padding: '12px' }}>
-                  Retornar à página inicial
-                </button>
-              </div>
-            </div>
+            <p className="text-muted-foreground text-xs">
+              Tentativas de fechar a janela, usar o botão voltar do navegador ou clicar em links externos são estritamente proibidas durante a prova.
+            </p>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button className="w-full" onClick={() => navigate('/student/exams')}>
+              Retornar à página inicial
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

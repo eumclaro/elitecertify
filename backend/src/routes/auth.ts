@@ -160,6 +160,67 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/auth/profile — Dados completos do aluno autenticado
+router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      include: { student: true },
+    });
+
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    return res.json({
+      name: user.name,
+      email: user.email,
+      lastName: user.student?.lastName || '',
+      phone: user.student?.phone || '',
+      cpf: user.student?.cpf || '',
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao buscar perfil' });
+  }
+});
+
+// PUT /api/auth/profile — Atualização do próprio perfil (aluno autenticado)
+router.put('/profile', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { name, lastName, phone, password } = req.body;
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      include: { student: true },
+    });
+
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    // Atualiza user.name e password se fornecidos
+    const userUpdate: any = {};
+    if (name && name.trim()) userUpdate.name = name.trim();
+    if (password && password.trim()) {
+      userUpdate.passwordHash = await bcrypt.hash(password, 12);
+    }
+    if (Object.keys(userUpdate).length > 0) {
+      await prisma.user.update({ where: { id: user.id }, data: userUpdate });
+    }
+
+    // Atualiza student.lastName e student.phone se aluno existir
+    if (user.student) {
+      const studentUpdate: any = {};
+      if (lastName !== undefined) studentUpdate.lastName = lastName;
+      if (phone !== undefined) studentUpdate.phone = phone;
+      if (Object.keys(studentUpdate).length > 0) {
+        await prisma.student.update({ where: { id: user.student.id }, data: studentUpdate });
+      }
+    }
+
+    return res.json({ message: 'Perfil atualizado com sucesso' });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    return res.status(500).json({ error: 'Erro ao atualizar perfil' });
+  }
+});
+
 // =========================================================
 // PASSWORD RECOVERY
 // =========================================================

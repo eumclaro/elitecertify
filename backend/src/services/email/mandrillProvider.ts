@@ -1,6 +1,5 @@
 import mailchimpTx from '@mailchimp/mailchimp_transactional';
 import { IEmailProvider, SendTemplateOptions } from './types';
-import { EMAIL_MAPPINGS } from '../../constants/emailEvents';
 import { env } from '../../config/env';
 
 export class MandrillProvider implements IEmailProvider {
@@ -28,8 +27,10 @@ export class MandrillProvider implements IEmailProvider {
     }
 
     console.log(`[MandrillProvider] Sending HTML for event: ${options.eventKey}`);
-    
+
     let renderedHtml = options.htmlContent;
+    console.log('[RENDER DEBUG] htmlContent recebido (primeiros 200 chars):', options.htmlContent?.substring(0, 200));
+    console.log('[RENDER DEBUG] dynamicData recebido:', JSON.stringify(options.dynamicData, null, 2));
     // Substituição simples de {{VAR}} pelos valores de dynamicData
     Object.entries(options.dynamicData).forEach(([key, value]) => {
       const regex = new RegExp(`{{${key}}}`, 'g');

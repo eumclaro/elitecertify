@@ -291,7 +291,7 @@ export async function sendExamFailedEmail(
   lastName: string = '',
   attemptId: string = ''
 ) {
-  return dispatchTemplateToMandrill('EXAM_FAILED', email, name, {
+  const dynamicData = {
     NAME: name,
     LAST_NAME: lastName,
     EMAIL: email,
@@ -305,7 +305,9 @@ export async function sendExamFailedEmail(
     COOLDOWN_TIME: cooldownEndDate ? cooldownEndDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
     RESULT_LINK: attemptId ? `${process.env.FRONTEND_URL}/student/result/${attemptId}` : '',
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
-  });
+  };
+  console.log('[MAIL DEBUG] dynamicData sendo enviado:', JSON.stringify(dynamicData, null, 2));
+  return dispatchTemplateToMandrill('EXAM_FAILED', email, name, dynamicData);
 }
 
 export async function sendExamAbandonedEmail(name: string, email: string, examName: string, lastName: string = '') {

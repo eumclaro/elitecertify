@@ -18,6 +18,7 @@ import emailTemplatesRoutes from './routes/emailTemplates';
 import dispatchRoutes from './routes/dispatches';
 import internalTemplatesRoutes from './routes/internalTemplates';
 import eventsRoutes from './routes/events';
+import certificateRoutes from './routes/certificates';
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use('/api/email-templates', emailTemplatesRoutes);
 app.use('/api/dispatches', dispatchRoutes);
 app.use('/api/internal-templates', internalTemplatesRoutes);
 app.use('/api/events', eventsRoutes);
+app.use('/api/certificates', certificateRoutes);
 
 // 404
 app.use((_req, res) => {

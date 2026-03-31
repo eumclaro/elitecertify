@@ -34,13 +34,14 @@ router.post('/surveys', authMiddleware, requireRole('ADMIN'), async (req: Reques
     const survey = await prisma.npsSurvey.create({
       data: {
         title,
-        classId: classId || null,
+        classId: (classId === 'ALL' || !classId) ? null : classId,
         createdBy: req.user!.userId,
         ...(questions?.length && {
           questions: {
             create: questions.map((q: any, i: number) => ({
               text: q.text,
               type: q.type || 'SCORE',
+              options: q.options || null,
               order: q.order ?? i + 1,
             })),
           },
@@ -64,7 +65,7 @@ router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: Req
       where: { id: req.params.id as string },
       data: {
         ...(title && { title }),
-        ...(classId !== undefined && { classId: classId || null }),
+        ...(classId !== undefined && { classId: classId === 'ALL' ? null : (classId || null) }),
         ...(status && { status }),
       },
     });
@@ -97,9 +98,16 @@ router.post('/surveys/:id/send', authMiddleware, requireRole('ADMIN'), async (re
     });
 
     if (!survey) return res.status(404).json({ error: 'Pesquisa não encontrada' });
-    if (!(survey as any).class) return res.status(400).json({ error: 'Pesquisa sem turma associada' });
+    
+    let studentIds: string[] = [];
+    if (survey.classId) {
+      studentIds = (survey as any).class.students.map((cs: any) => cs.studentId);
+    } else {
+      // Global NPS - send to all students
+      const allStudents = await prisma.student.findMany({ select: { id: true } });
+      studentIds = allStudents.map(s => s.id);
+    }
 
-    const studentIds = (survey as any).class.students.map((cs: any) => cs.studentId);
     const existingInvites = await prisma.npsInvite.findMany({
       where: { surveyId: survey.id, studentId: { in: studentIds } },
     });
@@ -107,7 +115,7 @@ router.post('/surveys/:id/send', authMiddleware, requireRole('ADMIN'), async (re
     const newStudentIds = studentIds.filter((id: string) => !existingStudentIds.includes(id));
 
     if (newStudentIds.length === 0) {
-      return res.json({ message: 'Todos os alunos já foram convidados', sent: 0 });
+      return res.json({ message: 'Todos os alunos elegíveis já foram convidados', sent: 0 });
     }
 
     await prisma.npsInvite.createMany({
@@ -133,8 +141,142 @@ router.post('/surveys/:id/send', authMiddleware, requireRole('ADMIN'), async (re
   }
 });
 
+// POST /api/nps/surveys/:id/send-individual — Send to one student
+router.post('/surveys/:id/send-individual', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const { studentId } = req.body;
+    if (!studentId) return res.status(400).json({ error: 'ID do aluno é obrigatório' });
+
+    const existingInvite = await prisma.npsInvite.findFirst({
+      where: { surveyId: req.params.id as string, studentId }
+    });
+
+    if (existingInvite) return res.status(400).json({ error: 'Aluno já possui convite para esta pesquisa' });
+
+    await prisma.npsInvite.create({
+      data: {
+        surveyId: req.params.id as string,
+        studentId,
+        token: uuid()
+      }
+    });
+
+    // Ensure survey is active
+    await prisma.npsSurvey.update({
+      where: { id: req.params.id as string },
+      data: { status: 'ACTIVE' }
+    });
+
+    return res.json({ message: 'Convite enviado com sucesso' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao enviar convite individual' });
+  }
+});
+
 // ============================================================
-// RESPOND — Public (token) or Authenticated
+// STUDENT ENDPOINTS
+// ============================================================
+
+// GET /api/nps/my-pending — List pending NPS for student
+router.get('/my-pending', authMiddleware, requireRole('STUDENT'), async (req: Request, res: Response) => {
+  try {
+    const student = await prisma.student.findUnique({ where: { userId: req.user!.userId } });
+    if (!student) return res.status(404).json({ error: 'Aluno não encontrado' });
+
+    const pending = await prisma.npsInvite.findMany({
+      where: { 
+        studentId: student.id,
+        respondedAt: null,
+        survey: { status: 'ACTIVE' }
+      },
+      include: {
+        survey: {
+          select: {
+            id: true,
+            title: true,
+            createdAt: true,
+            _count: { select: { questions: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return res.json(pending);
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao buscar pesquisas pendentes' });
+  }
+});
+
+// GET /api/nps/surveys/:id/student-details — Structure for student to respond
+router.get('/surveys/:id/student-details', authMiddleware, requireRole('STUDENT'), async (req: Request, res: Response) => {
+  try {
+    const student = await prisma.student.findUnique({ where: { userId: req.user!.userId } });
+    if (!student) return res.status(404).json({ error: 'Aluno não encontrado' });
+
+    const invite = await prisma.npsInvite.findFirst({
+      where: { surveyId: req.params.id as string, studentId: student.id },
+      include: {
+        survey: {
+          include: {
+            questions: { orderBy: { order: 'asc' } }
+          }
+        }
+      }
+    });
+
+    if (!invite) return res.status(404).json({ error: 'Convite não encontrado' });
+    if (invite.respondedAt) return res.status(400).json({ error: 'Você já respondeu esta pesquisa', alreadyResponded: true });
+
+    return res.json((invite as any).survey);
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao carregar detalhes da pesquisa' });
+  }
+});
+
+// POST /api/nps/responses/submit — Authenticated response submission
+router.post('/responses/submit', authMiddleware, requireRole('STUDENT'), async (req: Request, res: Response) => {
+  try {
+    const { surveyId, answers } = req.body;
+    const student = await prisma.student.findUnique({ where: { userId: req.user!.userId } });
+    if (!student) return res.status(404).json({ error: 'Aluno não encontrado' });
+
+    const invite = await prisma.npsInvite.findFirst({
+      where: { surveyId: surveyId as string, studentId: student.id }
+    });
+
+    if (!invite) return res.status(404).json({ error: 'Convite não encontrado' });
+    if (invite.respondedAt) return res.status(400).json({ error: 'Já respondida' });
+
+    const response = await prisma.npsResponse.create({
+      data: {
+        surveyId,
+        studentId: student.id,
+        inviteId: invite.id,
+        details: {
+          create: answers.map((a: any) => ({
+            questionId: a.questionId,
+            score: a.score ?? null,
+            text: a.text ?? null,
+          })),
+        },
+      },
+    });
+
+    await prisma.npsInvite.update({
+      where: { id: invite.id },
+      data: { respondedAt: new Date(), status: 'RESPONDED' },
+    });
+
+    return res.status(201).json({ message: 'Resposta registrada com sucesso' });
+  } catch (error) {
+    console.error('Submit NPS error:', error);
+    return res.status(500).json({ error: 'Erro ao registrar resposta' });
+  }
+});
+
+// ============================================================
+// RESPOND — Public (token)
 // ============================================================
 
 // GET /api/nps/respond/:token — Get survey by token
@@ -161,10 +303,10 @@ router.get('/respond/:token', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/nps/respond/:token — Submit NPS response
+// POST /api/nps/respond/:token — Submit NPS response via token
 router.post('/respond/:token', async (req: Request, res: Response) => {
   try {
-    const { answers } = req.body; // [{ questionId, score?, text? }]
+    const { answers } = req.body;
     const invite = await prisma.npsInvite.findUnique({
       where: { token: req.params.token as string },
     });
@@ -189,7 +331,7 @@ router.post('/respond/:token', async (req: Request, res: Response) => {
 
     await prisma.npsInvite.update({
       where: { id: invite.id },
-      data: { respondedAt: new Date() },
+      data: { respondedAt: new Date(), status: 'RESPONDED' },
     });
 
     return res.json({ message: 'Resposta registrada com sucesso', responseId: response.id });
@@ -217,32 +359,61 @@ router.get('/surveys/:id/results', authMiddleware, requireRole('ADMIN'), async (
             details: true,
           },
         },
+        class: {
+          include: {
+            students: {
+              include: {
+                student: { include: { user: { select: { name: true, email: true } } } }
+              }
+            }
+          }
+        }
       },
     });
 
     if (!survey) return res.status(404).json({ error: 'Pesquisa não encontrada' });
 
+    // Build class students status list
+    let studentsStatus: any[] = [];
+    if (survey.class) {
+      studentsStatus = survey.class.students.map((cs: any) => {
+        const invite = survey.invites.find(i => i.studentId === cs.studentId);
+        return {
+          id: cs.studentId,
+          name: cs.student.user.name,
+          email: cs.student.user.email,
+          status: invite?.respondedAt ? 'RESPONDED' : (invite ? 'PENDING' : 'NOT_INVITED')
+        };
+      });
+    }
+
     // Calculate NPS for score questions
-    const scoreQuestions = survey.questions.filter(q => q.type === 'SCORE');
+    const scoreQuestions = survey.questions.filter(q => q.type === 'SCORE' || q.type === 'RATING_5');
     let npsScore = null;
     let promoters = 0, detractors = 0, passives = 0;
 
     if (scoreQuestions.length > 0 && (survey as any).responses.length > 0) {
       (survey as any).responses.forEach((r: any) => {
-        r.details.forEach((d: any) => {
-          if (d.score !== null) {
-            if (d.score >= 9) promoters++;
-            else if (d.score <= 6) detractors++;
-            else passives++;
-          }
+        // We evaluate NPS generally based on the first score question or average if preferred.
+        // Usually NPS is based on the "Primary" question (the 0-10 one). 
+        // We'll take the first question that is SCORE.
+        const firstScore = r.details.find((d: any) => {
+          const q = survey.questions.find(sq => sq.id === d.questionId);
+          return q?.type === 'SCORE';
         });
+
+        if (firstScore && firstScore.score !== null) {
+          if (firstScore.score >= 9) promoters++;
+          else if (firstScore.score <= 6) detractors++;
+          else passives++;
+        }
       });
       const totalResponses = promoters + detractors + passives;
       npsScore = totalResponses > 0 ? Math.round(((promoters - detractors) / totalResponses) * 100) : 0;
     }
 
     return res.json({
-      survey: { id: survey.id, title: survey.title, status: survey.status },
+      survey: { id: survey.id, title: survey.title, status: survey.status, classId: survey.classId },
       stats: {
         totalInvites: (survey as any).invites.length,
         totalResponses: (survey as any).responses.length,
@@ -251,6 +422,7 @@ router.get('/surveys/:id/results', authMiddleware, requireRole('ADMIN'), async (
         promoters, passives, detractors,
       },
       questions: survey.questions,
+      studentsStatus,
       responses: (survey as any).responses.map((r: any) => ({
         id: r.id,
         studentName: r.student.user.name,
@@ -328,3 +500,4 @@ router.get('/history', authMiddleware, requireRole('STUDENT'), async (req: Reque
 });
 
 export default router;
+

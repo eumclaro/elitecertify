@@ -262,10 +262,19 @@ router.get('/:id/logs', authMiddleware, requireRole('ADMIN'), async (req: Reques
       orderBy: { createdAt: 'desc' }
     });
 
+    // Buscar IDs dos estudantes para permitir links no frontend
+    const emails = logs.map((l: any) => l.recipient);
+    const students = await prisma.student.findMany({
+      where: { user: { email: { in: emails } } },
+      select: { id: true, user: { select: { email: true } } }
+    });
+    const emailToId = Object.fromEntries(students.map((s: any) => [s.user.email, s.id]));
+
     // Mapear campos para o formato esperado pelo frontend
     const mapped = logs.map((log: any) => ({
       recipientName: (JSON.parse(log.payloadJson || '{}').NAME) || 'Estudante',
       recipientEmail: log.recipient,
+      studentId: emailToId[log.recipient] || null,
       status: log.status,
       failureReason: log.errorMessage,
       sentAt: log.sentAt || log.createdAt,

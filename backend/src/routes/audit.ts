@@ -21,7 +21,16 @@ router.get('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: 
     const [logs, total] = await Promise.all([
       prisma.auditEvent.findMany({
         where,
-        include: { user: { select: { name: true, email: true } } },
+        include: { 
+          user: { 
+            select: { 
+              name: true, 
+              email: true, 
+              role: true,
+              student: { select: { id: true } }
+            } 
+          } 
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: Number(limit),

@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import {
   Table,
@@ -384,10 +385,12 @@ export default function Students() {
                     <TableRow key={s.id} className="hover:bg-muted/30 transition-colors group">
                       <TableCell className="px-6">
                         <div className="flex items-center gap-3">
-                          <div className="size-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                            {s.user.name.charAt(0)}
-                          </div>
-                          <span className="font-semibold text-sm">{s.user.name} {s.lastName}</span>
+                          <Link 
+                            to={`/admin/students/${s.id}`}
+                            className="font-semibold text-sm hover:underline hover:text-primary transition-colors"
+                          >
+                            {s.user.name} {s.lastName}
+                          </Link>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -492,7 +495,14 @@ export default function Students() {
                       }))
                     ).map(entry => (
                       <TableRow key={entry.key}>
-                        <TableCell className="px-6 font-medium">{entry.student.user.name} {entry.student.lastName}</TableCell>
+                        <TableCell className="px-6">
+                          <Link 
+                            to={`/admin/students/${entry.student.id}`}
+                            className="font-medium hover:underline hover:text-primary transition-colors"
+                          >
+                            {entry.student.user.name} {entry.student.lastName}
+                          </Link>
+                        </TableCell>
                         <TableCell className="text-muted-foreground">{entry.student.user.email}</TableCell>
                         <TableCell>{entry.exam?.title || 'Prova'}</TableCell>
                         <TableCell>{new Date(entry.endsAt).toLocaleDateString()} {new Date(entry.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>

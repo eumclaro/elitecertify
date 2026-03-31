@@ -87,7 +87,13 @@ router.get('/:id/students', authMiddleware, requireRole('ADMIN'), async (req: Re
             user: { select: { name: true, email: true } },
             examAttempts: {
               orderBy: { createdAt: 'desc' },
-              select: { score: true, resultStatus: true, finishedAt: true, startedAt: true }
+              select: {
+                score: true,
+                resultStatus: true,
+                finishedAt: true,
+                startedAt: true,
+                exam: { select: { cooldownDays: true } }
+              }
             },
             cooldowns: {
               where: { status: 'ACTIVE', endsAt: { gt: new Date() } },
@@ -100,23 +106,26 @@ router.get('/:id/students', authMiddleware, requireRole('ADMIN'), async (req: Re
       orderBy: { joinedAt: 'desc' }
     });
 
-    const metrics = { total: 0, approved: 0, reproved: 0, pending: 0, cooldown: 0 };
-    
+    const metrics = { total: 0, approved: 0, reproved: 0, pending: 0, cooldown: 0, released: 0 };
+
     const students = classStudents.map((cs: any) => {
       const s = cs.student;
       const attempts = s.examAttempts || [];
       const activeCooldown = s.cooldowns[0] || null;
-      
+
       const hasPassed = attempts.some((a: any) => a.resultStatus === 'PASSED');
       const maxScore = attempts.length > 0 ? Math.max(...attempts.map((a: any) => a.score || 0)) : null;
       const lastAttempt = attempts[0] || null;
       const lastActivity = lastAttempt ? (lastAttempt.finishedAt || lastAttempt.startedAt) : null;
+      const lastExamHasCooldown = (lastAttempt?.exam?.cooldownDays ?? 0) > 0;
 
       let status = 'PENDING';
       if (hasPassed) {
         status = 'APPROVED';
       } else if (activeCooldown) {
         status = 'COOLDOWN';
+      } else if (attempts.length > 0 && lastExamHasCooldown) {
+        status = 'LIBERADO';
       } else if (attempts.length > 0) {
         status = 'REPROVED';
       }
@@ -125,6 +134,7 @@ router.get('/:id/students', authMiddleware, requireRole('ADMIN'), async (req: Re
       if (status === 'APPROVED') metrics.approved++;
       else if (status === 'COOLDOWN') metrics.cooldown++;
       else if (status === 'REPROVED') metrics.reproved++;
+      else if (status === 'LIBERADO') metrics.released++;
       else metrics.pending++;
 
       return {

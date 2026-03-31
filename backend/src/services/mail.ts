@@ -330,3 +330,39 @@ export async function sendCooldownReleasedEmail(name: string, email: string, exa
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
   });
 }
+
+export async function sendEventReferralEmail(
+  referrerName: string,
+  referredName: string,
+  referredEmail: string,
+  eventTitle: string,
+  eventDate: Date,
+  eventLocation: string,
+  isOnline: boolean
+) {
+  const formattedDate = eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const locationLabel = isOnline ? 'Online' : eventLocation;
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f9fafb;border-radius:12px;">
+      <h2 style="color:#111827;margin-bottom:8px;">Olá, ${referredName}!</h2>
+      <p style="color:#6b7280;margin-bottom:24px;">
+        <strong>${referrerName}</strong> achou que você adoraria participar deste evento da Elite Training.
+      </p>
+      <div style="background:#ffffff;border-radius:8px;padding:24px;border:1px solid #e5e7eb;margin-bottom:24px;">
+        <h3 style="color:#111827;margin:0 0 8px;">${eventTitle}</h3>
+        <p style="color:#6b7280;margin:4px 0;">📅 ${formattedDate}</p>
+        <p style="color:#6b7280;margin:4px 0;">📍 ${locationLabel}</p>
+      </div>
+      <p style="color:#6b7280;font-size:13px;">
+        Entre em contato com a Elite Training para saber mais sobre este evento.
+      </p>
+    </div>
+  `;
+
+  return sendMail({
+    to: referredEmail,
+    subject: `${referrerName} te indicou para: ${eventTitle}`,
+    html,
+  });
+}

@@ -72,8 +72,9 @@ router.get('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
       include: {
         user: { select: { id: true, name: true, email: true, role: true, active: true, lastLoginAt: true, createdAt: true } },
         classes: { include: { class: true } },
-        examAttempts: { include: { exam: { select: { id: true, title: true } } }, take: 10, orderBy: { startedAt: 'desc' } },
+        examAttempts: { include: { exam: { select: { id: true, title: true, cooldownDays: true } } }, take: 10, orderBy: { startedAt: 'desc' } },
         certificates: { include: { exam: { select: { id: true, title: true } } } },
+        cooldowns: { where: { status: 'ACTIVE', endsAt: { gt: new Date() } } },
       },
     });
 
@@ -390,4 +391,273 @@ router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), async (r
   }
 });
 
+// GET /api/students/:id/timeline — Unified activity timeline
+router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const studentId = req.params.id as string;
+
+    // Fetch the basic student info including user email for the email log query
+    const studentInfo = await prisma.student.findUnique({
+      where: { id: studentId },
+      include: { 
+        user: { select: { email: true, createdAt: true } },
+        classes: { include: { class: { select: { name: true } } } }
+      }
+    }) as any;
+
+    if (!studentInfo) return res.status(404).json({ error: 'Aluno não encontrado' });
+
+    // Fetch all relevant entities in parallel
+    const [attempts, cooldowns, emails, referrals, interests] = await Promise.all([
+      prisma.examAttempt.findMany({
+        where: { studentId },
+        include: { exam: { select: { title: true } } },
+        orderBy: { startedAt: 'desc' }
+      }),
+      prisma.cooldown.findMany({
+        where: { studentId },
+        include: { exam: { select: { title: true } } },
+        orderBy: { startedAt: 'desc' }
+      }),
+      prisma.emailLog.findMany({
+        where: { recipient: studentInfo.user.email },
+        orderBy: { createdAt: 'desc' },
+        take: 50
+      }),
+      prisma.eventReferral.findMany({
+        where: { referrerId: studentId },
+        include: { event: { select: { title: true } } },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.eventInterest.findMany({
+        where: { studentId },
+        include: { event: { select: { title: true } } },
+        orderBy: { createdAt: 'desc' }
+      })
+    ]);
+
+    const timeline: any[] = [];
+
+    // 1. Registration
+    timeline.push({
+      type: 'REGISTRATION',
+      date: studentInfo.user.createdAt,
+      title: 'Aluno cadastrado na plataforma',
+      description: 'Conta criada e acesso liberado pelo sistema.',
+      color: 'bg-green-500'
+    });
+
+    // 2. Enrollments
+    if (studentInfo.classes) {
+      studentInfo.classes.forEach((c: any) => {
+        timeline.push({
+          type: 'ENROLLMENT',
+          date: c.joinedAt, // Corrected to use the specific enrollment date
+          title: `Matriculado na turma ${c.class.name}`,
+          description: `Ingresso na turma para realização de provas e certificações.`,
+          color: 'bg-blue-500'
+        });
+      });
+    }
+
+    // 3. Exam Attempts
+    (attempts as any[]).forEach((a: any) => {
+      // Started
+      timeline.push({
+        type: 'EXAM_STARTED',
+        date: a.startedAt,
+        title: `Iniciou a prova ${a.exam?.title || 'Prova'}`,
+        description: `Sessão aberta via ${a.device || 'dispositivo desconhecido'}.`,
+        color: 'bg-amber-600'
+      });
+
+      // Finished
+      if (a.finishedAt) {
+        let statusTitle = '';
+        let color = '';
+        if (a.resultStatus === 'PASSED') {
+          statusTitle = `Aprovado na prova ${a.exam?.title || 'Prova'}`;
+          color = 'bg-emerald-600';
+        } else if (a.resultStatus === 'FAILED') {
+          statusTitle = `Reprovado na prova ${a.exam?.title || 'Prova'}`;
+          color = 'bg-rose-600';
+        }
+
+        if (statusTitle) {
+          timeline.push({
+            type: 'EXAM_RESULT',
+            date: a.finishedAt,
+            title: statusTitle,
+            description: `Resultado concluído com nota de ${a.score}%.`,
+            color: color
+          });
+        }
+      }
+
+      // Abandoned
+      if (a.executionStatus === 'ABANDONED') {
+        timeline.push({
+          type: 'EXAM_ABANDONED',
+          date: a.finishedAt || a.createdAt,
+          title: `Desclassificado na prova ${a.exam?.title || 'Prova'}`,
+          description: `A prova foi encerrada por abandono ou expiração de tempo.`,
+          color: 'bg-slate-600'
+        });
+      }
+    });
+
+    // 4. Cooldowns
+    (cooldowns as any[]).forEach((c: any) => {
+      timeline.push({
+        type: 'COOLDOWN_APPLIED',
+        date: c.startedAt,
+        title: `Cooldown aplicado — ${c.exam?.title || 'Prova'}`,
+        description: `Acesso bloqueado temporariamente até ${formatDT(new Date(c.endsAt))}.`,
+        color: 'bg-amber-600'
+      });
+
+      if (c.status === 'CLEARED') {
+        timeline.push({
+          type: 'COOLDOWN_RELEASED',
+          date: c.endsAt, 
+          title: 'Cooldown liberado manualmente',
+          description: `O bloqueio da prova ${c.exam?.title || 'Prova'} foi removido por um administrador.`,
+          color: 'bg-blue-600'
+        });
+      }
+    });
+
+    // 5. Emails
+    (emails as any[]).forEach((e: any) => {
+      timeline.push({
+        type: 'EMAIL_SENT',
+        date: e.createdAt,
+        title: `E-mail enviado: ${e.eventKey}`,
+        description: `Comunicação disparada via provedor ${e.provider}.`,
+        color: 'bg-indigo-600'
+      });
+    });
+
+    // 6. Referrals
+    (referrals as any[]).forEach((r: any) => {
+      timeline.push({
+        type: 'REFERRAL',
+        date: r.createdAt,
+        title: `Indicou um amigo para o evento`,
+        description: `Indicou ${r.referredName} (${r.referredEmail}) para o evento "${r.event?.title || 'Evento'}".`,
+        color: 'bg-violet-500'
+      });
+    });
+
+    // 7. Interests
+    (interests as any[]).forEach((i: any) => {
+      timeline.push({
+        type: 'INTEREST',
+        date: i.createdAt,
+        title: `Interesse no evento ${i.event?.title || 'Evento'}`,
+        description: `Demonstrou interesse em participar e receber mais informações.`,
+        color: 'bg-sky-600'
+      });
+    });
+
+    // Sort all events by date descending
+    const sortedTimeline = timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    // Pagination logic (applied after aggregation and sorting)
+    const { page = '1', limit = '10' } = req.query;
+    const p = parseInt(page as string);
+    const l = parseInt(limit as string);
+    const startIndex = (p - 1) * l;
+    const endIndex = p * l;
+    const total = sortedTimeline.length;
+    const slicedTimeline = sortedTimeline.slice(startIndex, endIndex);
+
+    return res.json({
+      data: slicedTimeline,
+      pagination: {
+        total,
+        page: p,
+        limit: l,
+        pages: Math.ceil(total / l),
+        hasMore: endIndex < total
+      }
+    });
+  } catch (error) {
+    console.error('Timeline error:', error);
+    return res.status(500).json({ error: 'Erro ao gerar timeline' });
+  }
+});
+
+function formatDT(date: Date) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date).replace(',', '');
+}
+
+// GET /api/students/:id/referrals — Get referrals made by student
+router.get('/:id/referrals', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const studentId = req.params.id as string;
+    const referrals = await prisma.eventReferral.findMany({
+      where: { referrerId: studentId },
+      include: { event: { select: { id: true, title: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+    return res.json(referrals);
+  } catch (error) {
+    console.error('Student referrals error:', error);
+    return res.status(500).json({ error: 'Erro ao buscar indicações' });
+  }
+});
+
+// POST /api/students/:id/enroll — Enroll student in a class
+router.post('/:id/enroll', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const { classId } = req.body;
+    if (!classId) return res.status(400).json({ error: 'ID da turma é obrigatório' });
+
+    const enrollment = await prisma.classStudent.create({
+      data: {
+        studentId: req.params.id as string,
+        classId
+      },
+      include: { class: true }
+    });
+
+    return res.status(201).json(enrollment);
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'Aluno já está matriculado nesta turma' });
+    }
+    console.error('Enroll student error:', error);
+    return res.status(500).json({ error: 'Erro ao matricular aluno' });
+  }
+});
+
+// DELETE /api/students/:id/unenroll/:classId — Unenroll student from a class
+router.delete('/:id/unenroll/:classId', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    await prisma.classStudent.delete({
+      where: {
+        classId_studentId: {
+          studentId: req.params.id as string,
+          classId: req.params.classId as string
+        }
+      }
+    });
+
+    return res.json({ message: 'Desmatriculado com sucesso' });
+  } catch (error) {
+    console.error('Unenroll student error:', error);
+    return res.status(500).json({ error: 'Erro ao desmatricular aluno' });
+  }
+});
+
 export default router;
+

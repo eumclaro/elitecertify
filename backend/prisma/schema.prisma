@@ -47,6 +47,8 @@ model Student {
   examReleases   ExamRelease[]
   npsInvites     NpsInvite[]
   npsResponses   NpsResponse[]
+  eventInterests EventInterest[]
+  eventReferrals EventReferral[]
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("students")
@@ -247,6 +249,7 @@ model NpsQuestion {
   order           Int                 @default(0)
   createdAt       DateTime            @default(now()) @map("created_at")
   type            NpsQuestionType     @default(SCORE)
+  options         String?             @map("options")
   survey          NpsSurvey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
   responseDetails NpsResponseDetail[]
 
@@ -466,4 +469,59 @@ enum NpsInviteStatus {
 enum NpsQuestionType {
   SCORE
   TEXT
+  MULTIPLE_CHOICE
+  RATING_5
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model Event {
+  id               String          @id @default(uuid())
+  title            String
+  shortDescription String          @map("short_description")
+  longDescription  String          @map("long_description")
+  date             DateTime
+  location         String
+  isOnline         Boolean         @default(false) @map("is_online")
+  coverImageUrl    String          @map("cover_image_url")
+  totalSpots       Int?            @map("total_spots")
+  price            Float?
+  status           EventStatus     @default(DRAFT)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  interests        EventInterest[]
+  referrals        EventReferral[]
+
+  @@map("events")
+}
+
+model EventInterest {
+  id        String   @id @default(uuid())
+  eventId   String   @map("event_id")
+  studentId String   @map("student_id")
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, studentId])
+  @@map("event_interests")
+}
+
+model EventReferral {
+  id            String   @id @default(uuid())
+  eventId       String   @map("event_id")
+  referrerId    String   @map("referrer_id")
+  referredName  String   @map("referred_name")
+  referredEmail String   @map("referred_email")
+  referredPhone String?  @map("referred_phone")
+  converted     Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  referrer      Student  @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+
+  @@map("event_referrals")
 }

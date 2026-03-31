@@ -575,7 +575,18 @@ export default function Dispatches() {
                         .filter(l => logFilter === 'ALL' || l.status === logFilter)
                         .map((log, idx) => (
                           <TableRow key={idx}>
-                            <TableCell className="font-medium">{log.recipientName}</TableCell>
+                            <TableCell className="font-medium">
+                              {log.studentId ? (
+                                <Link 
+                                  to={`/admin/students/${log.studentId}`}
+                                  className="hover:underline hover:text-primary transition-colors"
+                                >
+                                  {log.recipientName}
+                                </Link>
+                              ) : (
+                                log.recipientName
+                              )}
+                            </TableCell>
                             <TableCell className="text-muted-foreground">{log.recipientEmail}</TableCell>
                             <TableCell>
                               {log.status === 'SENT' ? (

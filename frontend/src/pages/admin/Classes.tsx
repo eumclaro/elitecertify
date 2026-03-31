@@ -39,6 +39,7 @@ import {
   AlertCircle,
   Clock,
   History,
+  Unlock,
   FileJson,
   Send,
   ChevronUp,
@@ -48,7 +49,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Tooltip,
   TooltipContent,
@@ -84,6 +85,7 @@ interface ClassMetrics {
   reproved: number;
   pending: number;
   cooldown: number;
+  released: number;
 }
 
 export default function Classes() {
@@ -110,7 +112,7 @@ export default function Classes() {
   // Dispatch Modal State
   const [isDispatchOpen, setIsDispatchOpen] = useState(false);
   const [dispatchStep, setDispatchStep] = useState(1);
-  const [dispatchFilter, setDispatchFilter] = useState<'ALL' | 'APPROVED' | 'REPROVED' | 'PENDING' | 'COOLDOWN'>('ALL');
+  const [dispatchFilter, setDispatchFilter] = useState<'ALL' | 'APPROVED' | 'REPROVED' | 'LIBERADO' | 'PENDING' | 'COOLDOWN'>('ALL');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [activeBindings, setActiveBindings] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -274,6 +276,7 @@ export default function Classes() {
       case 'APPROVED': return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Aprovado</Badge>;
       case 'REPROVED': return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Reprovado</Badge>;
       case 'COOLDOWN': return <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20">Em Cooldown</Badge>;
+      case 'LIBERADO': return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">Liberado</Badge>;
       default: return <Badge variant="outline">Pendente</Badge>;
     }
   };
@@ -391,7 +394,7 @@ export default function Classes() {
             <h1 className="text-2xl font-bold">{classData?.name}</h1>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
             <Card className="bg-muted/30">
               <CardContent className="p-4 pt-4 flex items-center gap-4">
                 <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg"><Users className="size-5" /></div>
@@ -408,6 +411,12 @@ export default function Classes() {
               <CardContent className="p-4 pt-4 flex items-center gap-4">
                 <div className="p-2 bg-red-500/10 text-red-500 rounded-lg"><AlertCircle className="size-5" /></div>
                 <div><p className="text-xs text-muted-foreground uppercase font-bold">Reprovados</p><p className="text-xl font-bold">{metrics?.reproved || 0}</p></div>
+              </CardContent>
+            </Card>
+            <Card className="bg-muted/30">
+              <CardContent className="p-4 pt-4 flex items-center gap-4">
+                <div className="p-2 bg-blue-500/10 text-blue-600 rounded-lg"><Unlock className="size-5" /></div>
+                <div><p className="text-xs text-muted-foreground uppercase font-bold">Liberados</p><p className="text-xl font-bold">{metrics?.released || 0}</p></div>
               </CardContent>
             </Card>
             <Card className="bg-muted/30">
@@ -431,13 +440,13 @@ export default function Classes() {
                 <Input placeholder="Filtrar aluno..." className="pl-9 bg-muted/50 h-9" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} />
               </div>
               <div className="flex bg-muted p-1 rounded-lg border">
-                {['ALL', 'APPROVED', 'REPROVED', 'PENDING', 'COOLDOWN'].map(s => (
+                {['ALL', 'APPROVED', 'REPROVED', 'LIBERADO', 'PENDING', 'COOLDOWN'].map(s => (
                   <button
                     key={s}
                     onClick={() => setStatusFilter(s)}
                     className={`px-3 py-1 text-[10px] uppercase font-bold rounded-md transition-all ${statusFilter === s ? 'bg-background shadow-sm' : 'opacity-40 hover:opacity-100'}`}
                   >
-                    {s === 'ALL' ? 'Todos' : s === 'APPROVED' ? 'Aprovado' : s === 'REPROVED' ? 'Reprovado' : s === 'PENDING' ? 'Pendente' : 'Cooldown'}
+                    {s === 'ALL' ? 'Todos' : s === 'APPROVED' ? 'Aprovado' : s === 'REPROVED' ? 'Reprovado' : s === 'LIBERADO' ? 'Liberado' : s === 'PENDING' ? 'Pendente' : 'Cooldown'}
                   </button>
                 ))}
               </div>
@@ -478,7 +487,12 @@ export default function Classes() {
                     <TableRow key={s.id}>
                       <TableCell className="px-6">
                         <div className="flex flex-col">
-                          <span className="font-medium text-sm">{s.name}</span>
+                          <Link 
+                            to={`/admin/students/${s.id}`}
+                            className="font-medium text-sm hover:underline hover:text-primary transition-colors"
+                          >
+                            {s.name}
+                          </Link>
                           <span className="text-[10px] text-muted-foreground">{s.email}</span>
                         </div>
                       </TableCell>
@@ -537,6 +551,7 @@ export default function Classes() {
                   { id: 'ALL', label: 'Todos', count: metrics?.total || 0, icon: <Users className="size-4" />, color: 'blue' },
                   { id: 'APPROVED', label: 'Aprovados', count: metrics?.approved || 0, icon: <CheckCircle2 className="size-4" />, color: 'green' },
                   { id: 'REPROVED', label: 'Reprovados', count: metrics?.reproved || 0, icon: <AlertCircle className="size-4" />, color: 'red' },
+                  { id: 'LIBERADO', label: 'Liberados', count: metrics?.released || 0, icon: <Unlock className="size-4" />, color: 'blue' },
                   { id: 'PENDING', label: 'Pendentes', count: metrics?.pending || 0, icon: <Target className="size-4" />, color: 'slate' },
                   { id: 'COOLDOWN', label: 'Em Cooldown', count: metrics?.cooldown || 0, icon: <Clock className="size-4" />, color: 'orange' },
                 ].map(group => (

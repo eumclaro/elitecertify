@@ -13,6 +13,7 @@ import {
   ChevronUp,
   Search,
   Send,
+  CalendarDays,
 } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
@@ -46,6 +47,7 @@ const adminLinks = [
   { path: '/admin/smtp', label: 'Settings', icon: Settings },
   { path: '/admin/emails', label: 'Templates de E-mail', icon: Mail },
   { path: '/admin/dispatches', label: 'Disparos', icon: Send },
+  { path: '/admin/events', label: 'Marketing Hub', icon: CalendarDays },
 ];
 
 const studentLinks = [

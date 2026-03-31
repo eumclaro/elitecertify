@@ -12,7 +12,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { AlertTriangle, Clock, FileText, Target, RefreshCw, CheckCircle2, Hourglass, XCircle, Rocket, Play, BarChart2 } from 'lucide-react';
+import { AlertTriangle, Clock, FileText, Target, RefreshCw, CheckCircle2, Hourglass, XCircle, Rocket, Play, BarChart2, CalendarDays, ChevronRight, MapPin, Wifi } from 'lucide-react';
+import { CardDescription } from '@/components/ui/card';
 
 interface ExamItem {
   id: string;
@@ -33,15 +34,19 @@ interface ExamItem {
 
 export default function StudentExams() {
   const [exams, setExams] = useState<ExamItem[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmStart, setConfirmStart] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/exam-engine/available')
-      .then(r => {
-        const fetchedExams = r.data;
+    Promise.all([
+      api.get('/exam-engine/available'),
+      api.get('/events')
+    ])
+      .then(([examsRes, eventsRes]) => {
+        const fetchedExams = examsRes.data;
         const abandonedAttemptId = localStorage.getItem('elt-cert-abandoned-attempt');
 
         if (abandonedAttemptId) {
@@ -64,6 +69,7 @@ export default function StudentExams() {
         }
 
         setExams(fetchedExams);
+        setEvents(eventsRes.data.filter((e: any) => e.status === 'PUBLISHED'));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -102,8 +108,62 @@ export default function StudentExams() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Minhas Provas</h2>
-        <p className="text-muted-foreground">Provas disponíveis para você</p>
+        <h2 className="text-2xl font-bold tracking-tight">Painel do Aluno</h2>
+        <p className="text-muted-foreground">Continue sua jornada de certificação</p>
+      </div>
+
+      {/* Events Carousel */}
+      {events.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <CalendarDays className="size-5 text-blue-600" /> Próximos Eventos
+            </h3>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1">
+            {events.map((event) => (
+              <Card
+                key={event.id}
+                className="flex-shrink-0 w-80 group cursor-pointer hover:border-blue-200 transition-all duration-300 shadow-sm hover:shadow-md"
+                onClick={() => navigate(`/student/event/${event.id}`)}
+              >
+                <div className="relative aspect-[16/9] overflow-hidden rounded-t-xl">
+                  <img
+                    src={event.coverImageUrl}
+                    alt={event.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute top-2 right-2">
+                    <Badge className="bg-black/50 backdrop-blur-sm border-none">
+                      {event.isOnline ? <Wifi className="size-3 mr-1" /> : <MapPin className="size-3 mr-1" />}
+                      {event.isOnline ? 'Online' : 'Presencial'}
+                    </Badge>
+                  </div>
+                </div>
+                <CardHeader className="p-4 pb-2">
+                  <div className="flex items-center gap-2 text-xs text-blue-600 font-semibold mb-1">
+                    <CalendarDays className="size-3" />
+                    {new Date(event.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                  </div>
+                  <CardTitle className="text-base line-clamp-1">{event.title}</CardTitle>
+                  <CardDescription className="line-clamp-2 text-xs">{event.shortDescription}</CardDescription>
+                </CardHeader>
+                <CardFooter className="px-4 pb-4 pt-2">
+                  <Button variant="ghost" size="sm" className="w-full text-xs gap-1 group-hover:bg-blue-50 group-hover:text-blue-700">
+                    Saber mais <ChevronRight className="size-3 transition-transform group-hover:translate-x-0.5" />
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Exams Section Header */}
+      <div className="pt-2">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <FileText className="size-5 text-muted-foreground" /> Minhas Provas
+        </h3>
       </div>
 
       {/* Empty state */}

@@ -69,12 +69,15 @@ export default function ExamResult() {
   const scoreColor = passed ? 'text-green-700' : isAbandoned ? 'text-orange-700' : 'text-red-700';
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+    <div className="p-6 space-y-6 max-w-5xl mx-auto">
 
       {/* Back Button */}
       <Button variant="outline" onClick={() => navigate('/student/exams')}>
         <ChevronLeft className="size-4 mr-1" /> Voltar às Provas
       </Button>
+
+      {/* Hero + Metrics — centralizados com largura mínima */}
+      <div className="w-full max-w-2xl mx-auto min-w-[600px] space-y-6">
 
       {/* Hero Card */}
       <Card className={cn('border-2', heroBg)}>
@@ -108,39 +111,50 @@ export default function ExamResult() {
               Sua prova foi anulada devido ao descumprimento das regras de segurança.
             </p>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              {result.correctAnswers} de {result.totalQuestions} questões corretas
-              {result.exam?.passingScore != null && <> — Mínimo: {result.exam.passingScore}%</>}
-            </p>
+            <div className="space-y-1 text-sm text-center">
+              <p className={cn('font-medium', passed ? 'text-green-600' : 'text-muted-foreground')}>
+                Você acertou {result.correctAnswers} de {result.totalQuestions} questões ({score}%)
+              </p>
+              {!passed && result.exam?.passingScore != null && result.totalQuestions > 0 && (() => {
+                const questoesNecessarias = Math.ceil(result.totalQuestions * (result.exam.passingScore / 100));
+                return (
+                  <p className="font-medium text-red-600">
+                    Para aprovação: mínimo de {questoesNecessarias} questões ({result.exam.passingScore}%)
+                  </p>
+                );
+              })()}
+            </div>
           )}
         </CardContent>
       </Card>
 
       {/* Metrics Row */}
       {!isAbandoned && result.totalQuestions > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="pt-5 pb-5 text-center">
-              <p className="text-2xl font-bold text-green-600">{result.correctAnswers ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">Corretas</p>
+        <div className="grid grid-cols-3 gap-4 w-full">
+          <Card className="flex-1">
+            <CardContent className="py-12 text-center">
+              <p className="text-4xl font-extrabold text-green-600 tabular-nums">{result.correctAnswers ?? 0}</p>
+              <p className="text-base text-muted-foreground mt-3 font-semibold uppercase tracking-wide">Corretas</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-5 pb-5 text-center">
-              <p className="text-2xl font-bold text-red-600">
+          <Card className="flex-1">
+            <CardContent className="py-12 text-center">
+              <p className="text-4xl font-extrabold text-red-600 tabular-nums">
                 {(result.totalQuestions ?? 0) - (result.correctAnswers ?? 0)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Erradas</p>
+              <p className="text-base text-muted-foreground mt-3 font-semibold uppercase tracking-wide">Erradas</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-5 pb-5 text-center">
-              <p className="text-2xl font-bold text-foreground">{result.totalQuestions ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">Total</p>
+          <Card className="flex-1">
+            <CardContent className="py-12 text-center">
+              <p className="text-4xl font-extrabold text-foreground tabular-nums">{result.totalQuestions ?? 0}</p>
+              <p className="text-base text-muted-foreground mt-3 font-semibold uppercase tracking-wide">Total</p>
             </CardContent>
           </Card>
         </div>
       )}
+
+      </div>{/* end hero+metrics wrapper */}
 
       {/* Certificate */}
       {result.certificate && (

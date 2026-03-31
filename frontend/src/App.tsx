@@ -20,7 +20,11 @@ import Dispatches from './pages/admin/Dispatches';
 import StudentExams from './pages/student/StudentExams';
 import TakeExam from './pages/student/TakeExam';
 import ExamResult from './pages/student/ExamResult';
+import StudentDetail from './pages/admin/StudentDetail';
+import StudentEventDetail from './pages/student/StudentEventDetail';
+import Events from './pages/admin/Events';
 import StudentProfile from './pages/student/StudentProfile';
+import StudentNps from './pages/student/StudentNps';
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
   const { user, loading } = useAuth();
@@ -43,6 +47,7 @@ function AppRoutes() {
       {/* Admin Routes */}
       <Route path="/admin" element={<ProtectedRoute adminOnly><Layout><Dashboard /></Layout></ProtectedRoute>} />
       <Route path="/admin/students" element={<ProtectedRoute adminOnly><Layout><Students /></Layout></ProtectedRoute>} />
+      <Route path="/admin/students/:id" element={<ProtectedRoute adminOnly><Layout><StudentDetail /></Layout></ProtectedRoute>} />
       <Route path="/admin/classes" element={<ProtectedRoute adminOnly><Layout><Classes /></Layout></ProtectedRoute>} />
       <Route path="/admin/exams" element={<ProtectedRoute adminOnly><Layout><Exams /></Layout></ProtectedRoute>} />
       <Route path="/admin/exams/:examId/questions" element={<ProtectedRoute adminOnly><Layout><ExamQuestions /></Layout></ProtectedRoute>} />
@@ -53,12 +58,15 @@ function AppRoutes() {
       <Route path="/admin/smtp" element={<ProtectedRoute adminOnly><Layout><SmtpSettings /></Layout></ProtectedRoute>} />
       <Route path="/admin/emails" element={<ProtectedRoute adminOnly><Layout><EmailManagement /></Layout></ProtectedRoute>} />
       <Route path="/admin/dispatches" element={<ProtectedRoute adminOnly><Layout><Dispatches /></Layout></ProtectedRoute>} />
+      <Route path="/admin/events" element={<ProtectedRoute adminOnly><Layout><Events /></Layout></ProtectedRoute>} />
 
       {/* Student Routes */}
       <Route path="/student/exams" element={<ProtectedRoute><Layout><StudentExams /></Layout></ProtectedRoute>} />
       <Route path="/student/exam/:attemptId" element={<ProtectedRoute><TakeExam /></ProtectedRoute>} />
       <Route path="/student/result/:attemptId" element={<ProtectedRoute><Layout><ExamResult /></Layout></ProtectedRoute>} />
       <Route path="/student/profile" element={<ProtectedRoute><Layout><StudentProfile /></Layout></ProtectedRoute>} />
+      <Route path="/student/nps/:id" element={<ProtectedRoute><StudentNps /></ProtectedRoute>} />
+      <Route path="/student/event/:id" element={<ProtectedRoute><Layout><StudentEventDetail /></Layout></ProtectedRoute>} />
 
       {/* Default redirect */}
       <Route path="*" element={<Navigate to={user ? (user.role === 'ADMIN' ? '/admin' : '/student/exams') : '/login'} replace />} />

@@ -35,10 +35,12 @@ import {
   Clock,
   UserCheck2,
   UserX2,
-  HelpCircle
+  HelpCircle,
+  Search
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -61,6 +63,7 @@ interface Survey {
   status: string; 
   classId: string | null; 
   class: any; 
+  npsScore: number | null;
   _count: { questions: number; invites: number; responses: number }; 
   createdAt: string; 
 }
@@ -79,6 +82,7 @@ export default function NpsSurveys() {
   const [selectedSurvey, setSelectedSurvey] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [sendingIndividual, setSendingIndividual] = useState<string | null>(null);
+  const [feedbackSearch, setFeedbackSearch] = useState('');
 
   const fetchSurveys = async () => {
     try {
@@ -234,6 +238,15 @@ export default function NpsSurveys() {
           </h1>
         </div>
 
+        {s.stats.totalResponses > 0 && (
+          <Alert className="border-blue-200 bg-blue-50/50">
+            <AlertCircle className="size-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 text-sm font-medium">
+              Esta pesquisa já possui respostas e não pode ser editada.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-muted/30 border-none">
             <CardContent className="p-4 pt-4 flex items-center gap-4">
@@ -334,14 +347,33 @@ export default function NpsSurveys() {
               </Button>
             </div>
 
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome ou e-mail do aluno..."
+                value={feedbackSearch}
+                onChange={e => setFeedbackSearch(e.target.value)}
+                className="pl-10 h-10"
+              />
+            </div>
+
+            {(() => {
+              const term = feedbackSearch.toLowerCase().trim();
+              const filtered = term
+                ? s.responses.filter((r: any) =>
+                    r.studentName.toLowerCase().includes(term) ||
+                    r.studentEmail.toLowerCase().includes(term)
+                  )
+                : s.responses;
+              return (
             <div className="space-y-4">
-              {s.responses.length === 0 ? (
+              {filtered.length === 0 ? (
                 <Card className="border-none shadow-sm">
                   <CardContent className="py-20 text-center text-muted-foreground italic">
-                    Nenhuma resposta recebida até o momento.
+                    {term ? 'Nenhum aluno encontrado para esta busca.' : 'Nenhuma resposta recebida até o momento.'}
                   </CardContent>
                 </Card>
-              ) : s.responses.map((r: any) => (
+              ) : filtered.map((r: any) => (
                 <Card key={r.id} className="border-none shadow-sm overflow-hidden">
                   <CardHeader className="bg-muted/20 px-6 py-4 flex flex-row items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -400,6 +432,8 @@ export default function NpsSurveys() {
                 </Card>
               ))}
             </div>
+              );
+            })()}
           </TabsContent>
 
           <TabsContent value="students" className="space-y-4">
@@ -489,9 +523,8 @@ export default function NpsSurveys() {
               <TableRow>
                 <TableHead className="px-6">Título</TableHead>
                 <TableHead>Turma</TableHead>
-                <TableHead className="text-center">Perguntas</TableHead>
-                <TableHead className="text-center">Convites</TableHead>
                 <TableHead className="text-center">Respostas</TableHead>
+                <TableHead className="text-center">Score NPS</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right px-6">Ações</TableHead>
               </TableRow>
@@ -499,7 +532,7 @@ export default function NpsSurveys() {
             <TableBody>
               {surveys.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-64 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-64 text-center text-muted-foreground">
                     Nenhuma pesquisa NPS encontrada.
                   </TableCell>
                 </TableRow>
@@ -507,10 +540,27 @@ export default function NpsSurveys() {
                 <TableRow key={s.id} className="hover:bg-muted/20 transition-colors group">
                   <TableCell className="px-6 font-bold group-hover:text-primary transition-colors">{s.title}</TableCell>
                   <TableCell className="text-muted-foreground">{s.class?.name || 'Todas (Global)'}</TableCell>
-                  <TableCell className="text-center font-medium">{s._count.questions}</TableCell>
-                  <TableCell className="text-center text-muted-foreground">{s._count.invites}</TableCell>
                   <TableCell className="text-center">
-                     <Badge variant="secondary" className="font-bold">{s._count.responses}</Badge>
+                     <span className="font-bold text-sm">
+                       {s._count.responses} de {s._count.invites}{' '}
+                       <span className="text-muted-foreground font-medium">
+                         ({s._count.invites > 0 ? Math.round((s._count.responses / s._count.invites) * 100) : '—'}
+                         {s._count.invites > 0 ? '%' : ''})
+                       </span>
+                     </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {s.npsScore !== null ? (
+                      <Badge className={`px-3 py-0.5 rounded-full font-black text-sm ${
+                        s.npsScore >= 50 ? 'bg-emerald-500/10 text-emerald-600 border-emerald-200' :
+                        s.npsScore >= 0 ? 'bg-amber-500/10 text-amber-600 border-amber-200' :
+                        'bg-rose-500/10 text-rose-600 border-rose-200'
+                      }`}>
+                        {s.npsScore}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge className={`gap-1 ${

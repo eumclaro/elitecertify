@@ -7,15 +7,21 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "seed": "tsx prisma/seed.ts",
+    "seed:reset": "prisma migrate reset --force && tsx prisma/seed.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
     "@mailchimp/mailchimp_transactional": "^1.4.1",
     "@prisma/client": "^6.5.0",
     "@types/pdfkit": "^0.17.5",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
@@ -28,6 +34,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",

@@ -16,10 +16,36 @@ router.get('/surveys', authMiddleware, async (req: Request, res: Response) => {
       include: {
         class: { select: { id: true, name: true } },
         _count: { select: { questions: true, invites: true, responses: true } },
+        questions: { select: { id: true, type: true }, orderBy: { order: 'asc' } },
+        responses: { include: { details: { select: { questionId: true, score: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
-    return res.json(surveys);
+
+    const result = surveys.map(s => {
+      let npsScore: number | null = null;
+      const scoreQuestionIds = s.questions.filter(q => q.type === 'SCORE').map(q => q.id);
+
+      if (scoreQuestionIds.length > 0 && s.responses.length > 0) {
+        let promoters = 0, detractors = 0, passives = 0;
+        s.responses.forEach(r => {
+          const firstScore = r.details.find(d => scoreQuestionIds.includes(d.questionId));
+          if (firstScore && firstScore.score !== null) {
+            if (firstScore.score >= 9) promoters++;
+            else if (firstScore.score <= 6) detractors++;
+            else passives++;
+          }
+        });
+        const total = promoters + detractors + passives;
+        npsScore = total > 0 ? Math.round(((promoters - detractors) / total) * 100) : 0;
+      }
+
+      // Remove heavy data from response
+      const { questions: _q, responses: _r, ...rest } = s as any;
+      return { ...rest, npsScore };
+    });
+
+    return res.json(result);
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao listar pesquisas' });
   }
@@ -60,9 +86,17 @@ router.post('/surveys', authMiddleware, requireRole('ADMIN'), async (req: Reques
 // PUT /api/nps/surveys/:id
 router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
+    const surveyId = req.params.id as string;
+
+    // Block editing if survey already has responses
+    const responseCount = await prisma.npsResponse.count({ where: { surveyId } });
+    if (responseCount > 0) {
+      return res.status(403).json({ error: 'Esta pesquisa já possui respostas e não pode ser editada.' });
+    }
+
     const { title, classId, status } = req.body;
     const survey = await prisma.npsSurvey.update({
-      where: { id: req.params.id as string },
+      where: { id: surveyId },
       data: {
         ...(title && { title }),
         ...(classId !== undefined && { classId: classId === 'ALL' ? null : (classId || null) }),

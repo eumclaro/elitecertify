@@ -94,7 +94,7 @@ router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: Req
       return res.status(403).json({ error: 'Esta pesquisa já possui respostas e não pode ser editada.' });
     }
 
-    const { title, classId, status } = req.body;
+    const { title, classId, status, questions } = req.body;
     const survey = await prisma.npsSurvey.update({
       where: { id: surveyId },
       data: {
@@ -103,7 +103,29 @@ router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: Req
         ...(status && { status }),
       },
     });
-    return res.json(survey);
+
+    // Update questions if provided
+    if (questions && Array.isArray(questions)) {
+      for (const q of questions) {
+        if (q.id && q.text) {
+          await prisma.npsQuestion.update({
+            where: { id: q.id },
+            data: {
+              text: q.text,
+              ...(q.type && { type: q.type }),
+              ...(q.options !== undefined && { options: q.options || null }),
+            },
+          });
+        }
+      }
+    }
+
+    const updated = await prisma.npsSurvey.findUnique({
+      where: { id: surveyId },
+      include: { questions: { orderBy: { order: 'asc' } } },
+    });
+
+    return res.json(updated);
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao atualizar pesquisa' });
   }

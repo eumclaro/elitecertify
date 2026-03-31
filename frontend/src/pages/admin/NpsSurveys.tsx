@@ -36,7 +36,9 @@ import {
   UserCheck2,
   UserX2,
   HelpCircle,
-  Search
+  Search,
+  ListOrdered,
+  Save
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,6 +85,8 @@ export default function NpsSurveys() {
   const [isSaving, setIsSaving] = useState(false);
   const [sendingIndividual, setSendingIndividual] = useState<string | null>(null);
   const [feedbackSearch, setFeedbackSearch] = useState('');
+  const [editableQuestions, setEditableQuestions] = useState<any[]>([]);
+  const [savingQuestions, setSavingQuestions] = useState(false);
 
   const fetchSurveys = async () => {
     try {
@@ -173,6 +177,7 @@ export default function NpsSurveys() {
     try {
       const { data } = await api.get(`/nps/surveys/${id}/results`);
       setSelectedSurvey(data);
+      setEditableQuestions(data.questions?.map((q: any) => ({ ...q })) || []);
     } catch (err) { 
       console.error(err); 
       toast.error("Erro ao carregar resultados");
@@ -303,6 +308,7 @@ export default function NpsSurveys() {
         <Tabs defaultValue="results" className="space-y-6">
           <TabsList className="bg-muted/50 p-1">
             <TabsTrigger value="results" className="gap-2"><BarChart3 className="size-4" /> Resultados Detalhados</TabsTrigger>
+            <TabsTrigger value="questions" className="gap-2"><ListOrdered className="size-4" /> Perguntas</TabsTrigger>
             <TabsTrigger value="students" className="gap-2"><Users className="size-4" /> Alunos da Turma</TabsTrigger>
           </TabsList>
 
@@ -499,6 +505,99 @@ export default function NpsSurveys() {
                </Table>
             </Card>
           </TabsContent>
+
+          <TabsContent value="questions" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <ListOrdered className="size-5 text-primary" /> Perguntas da Pesquisa
+              </h2>
+              {s.stats.totalResponses === 0 && (
+                <Button
+                  size="sm"
+                  className="gap-2 font-bold h-9"
+                  disabled={savingQuestions}
+                  onClick={async () => {
+                    setSavingQuestions(true);
+                    try {
+                      await api.put(`/nps/surveys/${s.survey.id}`, {
+                        questions: editableQuestions.map((q: any) => ({
+                          id: q.id,
+                          text: q.text,
+                          type: q.type,
+                          options: q.options,
+                        })),
+                      });
+                      toast.success('Perguntas atualizadas com sucesso!');
+                      viewResults(s.survey.id);
+                    } catch (err: any) {
+                      if (err.response?.status === 403) {
+                        toast.error(err.response.data.error);
+                        viewResults(s.survey.id);
+                      } else {
+                        toast.error('Erro ao salvar perguntas');
+                      }
+                    } finally {
+                      setSavingQuestions(false);
+                    }
+                  }}
+                >
+                  {savingQuestions ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                  Salvar Alterações
+                </Button>
+              )}
+            </div>
+
+            {s.stats.totalResponses > 0 && (
+              <Alert className="border-blue-200 bg-blue-50/50">
+                <AlertCircle className="size-4 text-blue-600" />
+                <AlertDescription className="text-blue-800 text-sm font-medium">
+                  Esta pesquisa já possui respostas e não pode ser editada.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-4">
+              {(s.stats.totalResponses > 0 ? s.questions : editableQuestions).map((q: any, idx: number) => (
+                <Card key={q.id} className="border-none shadow-sm overflow-hidden">
+                  <CardContent className="p-5">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 size-8 rounded-full bg-muted flex items-center justify-center text-xs font-black text-muted-foreground">
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1 space-y-3">
+                        {s.stats.totalResponses > 0 ? (
+                          <p className="text-sm font-semibold leading-relaxed pt-1">{q.text}</p>
+                        ) : (
+                          <Input
+                            value={q.text}
+                            onChange={e => {
+                              setEditableQuestions(prev =>
+                                prev.map((p: any) => p.id === q.id ? { ...p, text: e.target.value } : p)
+                              );
+                            }}
+                            className="font-medium"
+                          />
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider">
+                            {q.type === 'SCORE' ? 'Régua 0–10 (NPS)' :
+                             q.type === 'RATING_5' ? 'Escala 1–5 (Estrelas)' :
+                             q.type === 'MULTIPLE_CHOICE' ? 'Múltipla Escolha' : 'Texto Aberto'}
+                          </Badge>
+                          {q.type === 'MULTIPLE_CHOICE' && q.options && (
+                            <span className="text-[10px] text-muted-foreground italic">
+                              Opções: {q.options}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
         </Tabs>
       </div>
     );

@@ -202,6 +202,23 @@ export default function NpsSurveys() {
     );
   }
 
+  const handleExport = async (surveyId: string, title: string) => {
+    try {
+      const response = await api.get(`/nps/surveys/${surveyId}/export`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const fileName = `NPS_${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error("Erro ao exportar dados");
+    }
+  };
+
   // Results view
   if (selectedSurvey) {
     const s = selectedSurvey;
@@ -307,10 +324,13 @@ export default function NpsSurveys() {
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <MessageSquare className="size-5 text-primary" /> Feedback dos Alunos
               </h2>
-              <Button variant="outline" size="sm" asChild className="gap-2 font-bold h-9">
-                <a href={`/api/nps/surveys/${s.survey.id}/export`} target="_blank" rel="noopener noreferrer">
-                  <Download className="size-4" /> Exportar CSV
-                </a>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 font-bold h-9"
+                onClick={() => handleExport(s.survey.id, s.survey.title)}
+              >
+                <Download className="size-4" /> Exportar CSV
               </Button>
             </div>
 
@@ -349,7 +369,7 @@ export default function NpsSurveys() {
                             {q.text}
                           </p>
                           <div className="pl-7">
-                            {answer?.score !== null && (
+                            {answer && answer.score !== null && (
                               <div className="flex items-center gap-2">
                                 <Badge variant={
                                   q.type === 'RATING_5' 

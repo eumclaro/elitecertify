@@ -25,6 +25,7 @@ import StudentEventDetail from './pages/student/StudentEventDetail';
 import Events from './pages/admin/Events';
 import StudentProfile from './pages/student/StudentProfile';
 import StudentNps from './pages/student/StudentNps';
+import ValidateCertificate from './pages/ValidateCertificate';
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
   const { user, loading } = useAuth();
@@ -67,6 +68,7 @@ function AppRoutes() {
       <Route path="/student/profile" element={<ProtectedRoute><Layout><StudentProfile /></Layout></ProtectedRoute>} />
       <Route path="/student/nps/:id" element={<ProtectedRoute><StudentNps /></ProtectedRoute>} />
       <Route path="/student/event/:id" element={<ProtectedRoute><Layout><StudentEventDetail /></Layout></ProtectedRoute>} />
+      <Route path="/validar/:code" element={<ValidateCertificate />} />
 
       {/* Default redirect */}
       <Route path="*" element={<Navigate to={user ? (user.role === 'ADMIN' ? '/admin' : '/student/exams') : '/login'} replace />} />

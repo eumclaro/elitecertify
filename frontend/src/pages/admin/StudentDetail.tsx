@@ -66,7 +66,9 @@ import {
   EyeOff,
   Eye,
   Trash2,
-  Save
+  Save,
+  Trophy as TrophyIcon,
+  Download as DownloadIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from 'date-fns';
@@ -96,6 +98,7 @@ interface StudentInfo {
   examAttempts?: any[];
   cooldowns?: any[];
   referrals?: any[];
+  certificates?: any[];
 }
 
 interface TimelineItem {
@@ -127,6 +130,7 @@ export default function StudentDetail() {
   const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -179,6 +183,34 @@ export default function StudentDetail() {
   useEffect(() => {
     fetchData();
   }, [id]);
+
+  const handleDownloadCertificate = async (code: string) => {
+    setDownloading(code);
+    try {
+      const token = localStorage.getItem('elt-cert-token');
+      const response = await fetch(`/api/certificates/${code}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!response.ok) throw new Error('Erro ao baixar certificado');
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificado-${code}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Download iniciado!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao gerar o PDF do certificado');
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -334,6 +366,9 @@ export default function StudentDetail() {
           </TabsTrigger>
           <TabsTrigger value="classes" className="px-8 data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
             <Calendar className="size-4" /> Turmas
+          </TabsTrigger>
+          <TabsTrigger value="certificates" className="px-8 data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
+            <TrophyIcon className="size-4" /> Certificados
           </TabsTrigger>
           <TabsTrigger value="edit" className="px-8 data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
             <Edit3 className="size-4" /> Editar Perfil
@@ -601,6 +636,66 @@ export default function StudentDetail() {
                   </tbody>
                 </table>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* --- Aba Certificados --- */}
+        <TabsContent value="certificates" className="outline-none py-4">
+          <Card className="border-none shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Certificados Emitidos</CardTitle>
+              <CardDescription>Lista de certificados de aprovação conquistados pelo aluno.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(!student.certificates || student.certificates.length === 0) ? (
+                <div className="h-40 flex flex-col items-center justify-center text-muted-foreground opacity-50 italic">
+                  Este aluno ainda não possui certificados emitidos.
+                </div>
+              ) : (
+                <div className="rounded-xl border overflow-hidden bg-card">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 text-muted-foreground border-b uppercase text-[10px] font-black tracking-wider">
+                      <tr>
+                        <th className="px-6 py-3 text-left">Prova / Curso</th>
+                        <th className="px-6 py-3 text-left">Código</th>
+                        <th className="px-6 py-3 text-left">Data de Emissão</th>
+                        <th className="px-6 py-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {(student as any).certificates.map((cert: any) => (
+                        <tr key={cert.id} className="hover:bg-muted/10 transition-colors">
+                          <td className="px-6 py-4 font-semibold">
+                            {cert.exam?.title || 'Exame'}
+                          </td>
+                          <td className="px-6 py-4 font-mono text-xs opacity-70">
+                            {cert.code}
+                          </td>
+                          <td className="px-6 py-4 text-muted-foreground">
+                            {format(new Date(cert.issuedAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="gap-2 h-8 font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                              onClick={() => handleDownloadCertificate(cert.code)}
+                              disabled={downloading === cert.code}
+                            >
+                              {downloading === cert.code ? (
+                                <Loader2 className="size-3 animate-spin" />
+                              ) : (
+                                <DownloadIcon className="size-3" />
+                              )}
+                              Baixar PDF
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { ChevronLeft, CheckCircle2, XCircle, Award, Trophy, ShieldAlert, Clock } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, XCircle, Trophy, ShieldAlert, Clock, Download, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export default function ExamResult() {
@@ -16,6 +17,8 @@ export default function ExamResult() {
   const [result, setResult] = useState<any>(location.state || null);
   const [loading, setLoading] = useState(!location.state);
 
+  const [downloading, setDownloading] = useState(false);
+
   useEffect(() => {
     if (!result) {
       api.get(`/exam-engine/result/${attemptId}`)
@@ -24,6 +27,34 @@ export default function ExamResult() {
         .finally(() => setLoading(false));
     }
   }, [attemptId, result, navigate]);
+
+  const handleDownloadCertificate = async (code: string) => {
+    setDownloading(true);
+    try {
+      const token = localStorage.getItem('elt-cert-token');
+      const response = await fetch(`/api/certificates/${code}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!response.ok) throw new Error('Erro ao baixar certificado');
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificado-${code}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Download iniciado!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao gerar o PDF do certificado');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -158,29 +189,40 @@ export default function ExamResult() {
 
       {/* Certificate */}
       {result.certificate && (
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="pt-5 pb-5 flex items-center gap-3">
-            <Trophy className="size-8 text-green-600 shrink-0" />
-            <div>
-              <p className="font-semibold text-green-800 flex items-center gap-2">
-                Certificado emitido
-                <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100" variant="outline">
-                  Disponível
-                </Badge>
-              </p>
-              <p className="text-sm text-green-700 font-mono mt-0.5">{result.certificate.code}</p>
-              {result.certificate.url && (
-                <a
-                  href={result.certificate.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-green-700 underline underline-offset-2 hover:text-green-900 mt-1 inline-block"
-                >
-                  <Award className="inline size-3.5 mr-1" />
-                  Acessar certificado
-                </a>
-              )}
+        <Card className="border-green-200 bg-green-50 shadow-sm">
+          <CardContent className="p-6 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="size-12 rounded-full bg-green-100 flex items-center justify-center">
+                <Trophy className="size-6 text-green-600" />
+              </div>
+              <div>
+                <p className="font-bold text-green-900 flex items-center gap-2">
+                  Certificado Disponível
+                  <Badge className="bg-green-600 text-white border-none" variant="outline">
+                    Aprovado
+                  </Badge>
+                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-xs text-green-700 font-mono bg-green-100/50 px-1.5 py-0.5 rounded border border-green-200">
+                    {result.certificate.code}
+                  </p>
+                  <span className="text-[10px] text-green-600/60 uppercase font-black">Código de Autenticidade</span>
+                </div>
+              </div>
             </div>
+
+            <Button 
+              onClick={() => handleDownloadCertificate(result.certificate.code)}
+              className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2 px-6 shadow-md transition-all active:scale-95"
+              disabled={downloading}
+            >
+              {downloading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Download className="size-4" />
+              )}
+              {downloading ? 'Gerando PDF...' : 'Baixar Certificado'}
+            </Button>
           </CardContent>
         </Card>
       )}

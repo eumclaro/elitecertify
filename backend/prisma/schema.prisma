@@ -95,7 +95,8 @@ model Exam {
   cooldownDays    Int           @default(0) @map("cooldown_days")
   questionOrder   QuestionOrder @default(FIXED) @map("question_order")
   status          ExamStatus    @default(DRAFT)
-  certificateTemplate String? @map("certificate_template")
+  certificateTemplateId String? @map("certificate_template_id")
+  certificateTemplate   CertificateTemplate? @relation(fields: [certificateTemplateId], references: [id])
   certificates    Certificate[]
   cooldowns       Cooldown[]
   attempts        ExamAttempt[]
@@ -525,4 +526,21 @@ model EventReferral {
   referrer      Student  @relation(fields: [referrerId], references: [id], onDelete: Cascade)
 
   @@map("event_referrals")
+}
+
+model CertificateTemplate {
+  id              String   @id @default(uuid())
+  name            String
+  fileName        String   @map("file_name")
+  nameTop         Float    @default(53.1) @map("name_top")
+  nameLeft        Float    @default(14.2) @map("name_left")
+  codeTop         Float    @default(72.1) @map("code_top")
+  codeLeft        Float    @default(59.1) @map("code_left")
+  dateBottom      Float    @default(12.0) @map("date_bottom")
+  dateLeft        Float    @default(16.2) @map("date_left")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  exams           Exam[]
+
+  @@map("certificate_templates")
 }

@@ -23,6 +23,7 @@ import ExamResult from './pages/student/ExamResult';
 import StudentDetail from './pages/admin/StudentDetail';
 import StudentEventDetail from './pages/student/StudentEventDetail';
 import Events from './pages/admin/Events';
+import CertificateTemplates from './pages/admin/CertificateTemplates';
 import StudentProfile from './pages/student/StudentProfile';
 import StudentNps from './pages/student/StudentNps';
 import ValidateCertificate from './pages/ValidateCertificate';
@@ -60,6 +61,7 @@ function AppRoutes() {
       <Route path="/admin/emails" element={<ProtectedRoute adminOnly><Layout><EmailManagement /></Layout></ProtectedRoute>} />
       <Route path="/admin/dispatches" element={<ProtectedRoute adminOnly><Layout><Dispatches /></Layout></ProtectedRoute>} />
       <Route path="/admin/events" element={<ProtectedRoute adminOnly><Layout><Events /></Layout></ProtectedRoute>} />
+      <Route path="/admin/certificate-templates" element={<ProtectedRoute adminOnly><Layout><CertificateTemplates /></Layout></ProtectedRoute>} />
 
       {/* Student Routes */}
       <Route path="/student/exams" element={<ProtectedRoute><Layout><StudentExams /></Layout></ProtectedRoute>} />

@@ -182,6 +182,35 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
   }
 });
 
+// PATCH /api/exams/:id/certificate-template — Link template to exam
+router.patch('/:id/certificate-template', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { certificateTemplateId } = req.body;
+
+    const existing = await prisma.exam.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Prova não encontrada' });
+    }
+
+    const exam = await prisma.exam.update({
+      where: { id },
+      data: {
+        certificateTemplateId: certificateTemplateId || null,
+      },
+    });
+
+    await prisma.auditEvent.create({
+      data: { userId: req.user!.userId, action: 'EXAM_TEMPLATE_LINKED', entity: 'Exam', entityId: exam.id, ip: req.ip, metadata: JSON.stringify({ certificateTemplateId }) }
+    });
+
+    return res.json(exam);
+  } catch (error) {
+    console.error('Update exam template error:', error);
+    return res.status(500).json({ error: 'Erro ao vincular template à prova' });
+  }
+});
+
 // DELETE /api/exams/:id — Delete exam
 router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {

@@ -69,6 +69,7 @@ interface Exam {
   cooldownDays: number;
   questionOrder: 'FIXED' | 'RANDOM';
   status: string;
+  certificateTemplateId: string | null;
   releases: ExamRelease[];
   _count: { questions: number; attempts: number; releases: number };
   createdAt: string;
@@ -80,6 +81,7 @@ export default function Exams() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [templates, setTemplates] = useState<{id: string, name: string}[]>([]);
   
   // Modals
   const [showModal, setShowModal] = useState(false);
@@ -89,22 +91,30 @@ export default function Exams() {
     title: '', description: '',
     questionCount: 10, durationMinutes: 60, passingScore: 70,
     maxAttempts: 0, cooldownDays: 0, questionOrder: 'FIXED' as 'FIXED' | 'RANDOM',
+    certificateTemplateId: null as string | null,
   });
 
-  const loadExams = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/exams', { params: { search } });
-      setExams(res.data.data);
-    } catch (err) { console.error(err); toast.error("Erro ao carregar provas"); }
+      const [resExams, resTpls] = await Promise.all([
+        api.get('/exams', { params: { search } }),
+        api.get('/certificate-templates')
+      ]);
+      setExams(resExams.data.data);
+      setTemplates(resTpls.data);
+    } catch (err) { console.error(err); toast.error("Erro ao carregar dados"); }
     setLoading(false);
   };
 
-  useEffect(() => { loadExams(); }, []);
+  useEffect(() => { loadData(); }, [search]); // Depend on search here if we want but actually the original had loadExams in enter but search was manually triggered.
+
+  // Restore the original behavior for search
+  const triggerSearch = () => { loadData(); };
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ title: '', description: '', questionCount: 10, durationMinutes: 60, passingScore: 70, maxAttempts: 0, cooldownDays: 0, questionOrder: 'FIXED' });
+    setForm({ title: '', description: '', questionCount: 10, durationMinutes: 60, passingScore: 70, maxAttempts: 0, cooldownDays: 0, questionOrder: 'FIXED', certificateTemplateId: null });
     setShowModal(true);
   };
 
@@ -119,6 +129,7 @@ export default function Exams() {
       maxAttempts: exam.maxAttempts,
       cooldownDays: exam.cooldownDays,
       questionOrder: exam.questionOrder as 'FIXED' | 'RANDOM',
+      certificateTemplateId: exam.certificateTemplateId,
     });
     setShowModal(true);
   };
@@ -135,7 +146,7 @@ export default function Exams() {
         toast.success("Prova criada");
       }
       setShowModal(false);
-      loadExams();
+      triggerSearch();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Erro ao salvar prova');
     } finally {
@@ -148,7 +159,7 @@ export default function Exams() {
     try {
       await api.delete(`/exams/${exam.id}`);
       toast.success("Prova excluída");
-      loadExams();
+      triggerSearch();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Erro ao excluir prova');
     }
@@ -159,7 +170,7 @@ export default function Exams() {
     try {
       await api.put(`/exams/${exam.id}`, { status: newStatus });
       toast.success(newStatus === 'PUBLISHED' ? "Prova publicada" : "Prova movida para rascunho");
-      loadExams();
+      triggerSearch();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Erro ao alterar status');
     }
@@ -196,10 +207,10 @@ export default function Exams() {
             className="pl-9 bg-muted/50"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && loadExams()}
+            onKeyDown={(e) => e.key === 'Enter' && triggerSearch()}
           />
         </div>
-        <Button variant="secondary" onClick={loadExams}>Buscar</Button>
+        <Button variant="secondary" onClick={triggerSearch}>Buscar</Button>
       </div>
 
       <Card className="border-none shadow-sm overflow-hidden">
@@ -371,6 +382,21 @@ export default function Exams() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Template de Certificado</Label>
+              <Select value={form.certificateTemplateId || "none"} onValueChange={(v) => setForm({ ...form, certificateTemplateId: v === "none" ? null : v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum Template (Não emite certificado)</SelectItem>
+                  {templates.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter className="pt-4">
               <Button type="button" variant="ghost" onClick={() => setShowModal(false)} disabled={isSaving}>Cancelar</Button>

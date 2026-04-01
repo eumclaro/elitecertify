@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,8 +13,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { AlertTriangle, Clock, FileText, Target, RefreshCw, CheckCircle2, Hourglass, XCircle, Rocket, Play, BarChart2, CalendarDays, ChevronRight, MapPin, Wifi } from 'lucide-react';
+import { AlertTriangle, Clock, FileText, Target, RefreshCw, CheckCircle2, Hourglass, XCircle, Rocket, Play, BarChart2, CalendarDays, ChevronRight, MapPin, Wifi, Download, Loader2 } from 'lucide-react';
 import { CardDescription } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 interface ExamItem {
   id: string;
@@ -38,6 +40,8 @@ export default function StudentExams() {
   const [loading, setLoading] = useState(true);
   const [confirmStart, setConfirmStart] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [downloadingCert, setDownloadingCert] = useState<string | null>(null);
+  const { token } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -85,6 +89,28 @@ export default function StudentExams() {
       alert(err.response?.data?.error || 'Erro ao iniciar prova');
       setStarting(false);
       setConfirmStart(null);
+    }
+  };
+
+  const handleDownload = async (code: string) => {
+    setDownloadingCert(code);
+    try {
+      const response = await fetch(`/api/certificates/${code}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Erro ao baixar')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `certificado-${code}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Download iniciado!');
+    } catch {
+      toast.error('Erro ao gerar o PDF do certificado');
+    } finally {
+      setDownloadingCert(null);
     }
   };
 
@@ -249,6 +275,23 @@ export default function StudentExams() {
                       : exam.lastAttempt.resultStatus === 'FAILED_TIMEOUT'
                       ? '(Tempo Esgotado)'
                       : `(${exam.lastAttempt.score}%)`}
+                  </Button>
+                )}
+
+                {exam.hasCertificate && exam.certificateCode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full font-bold border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 h-9"
+                    onClick={() => handleDownload(exam.certificateCode!)}
+                    disabled={downloadingCert === exam.certificateCode}
+                  >
+                    {downloadingCert === exam.certificateCode ? (
+                      <Loader2 className="size-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="size-4 mr-2" />
+                    )}
+                    {downloadingCert === exam.certificateCode ? 'Gerando...' : 'Baixar Certificado'}
                   </Button>
                 )}
               </CardFooter>

@@ -17,12 +17,13 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Award, Star, ExternalLink, Pencil, Lock, Eye, EyeOff, Share2, Circle, CheckCircle2, UserCircle, Clock } from 'lucide-react';
+import { Award, Star, ExternalLink, Pencil, Lock, Eye, EyeOff, Share2, Circle, CheckCircle2, UserCircle, Clock, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function StudentProfile() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [certificates, setCertificates] = useState<any[]>([]);
+  const [downloadingCert, setDownloadingCert] = useState<string | null>(null);
   const [npsHistory, setNpsHistory] = useState<any[]>([]);
   const [pendingNps, setPendingNps] = useState<any[]>([]);
   const [referrals, setReferrals] = useState<any[]>([]);
@@ -80,7 +81,27 @@ export default function StudentProfile() {
       setSaving(false);
     }
   };
-
+  const handleDownload = async (code: string) => {
+    setDownloadingCert(code);
+    try {
+      const response = await fetch(`/api/certificates/${code}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Erro ao baixar')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `certificado-${code}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Download iniciado!');
+    } catch {
+      toast.error('Erro ao gerar o PDF do certificado');
+    } finally {
+      setDownloadingCert(null);
+    }
+  };
   useEffect(() => {
     Promise.all([
       api.get('/exam-engine/certificates').catch(() => ({ data: [] })),
@@ -290,6 +311,20 @@ export default function StudentProfile() {
                           <Badge variant="outline" className="text-xs bg-green-100 text-green-800 border-green-300">
                             Aprovado
                           </Badge>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 px-3 text-xs gap-1.5 border-green-200 text-green-700 hover:bg-green-100 hover:text-green-800 font-bold"
+                            onClick={() => handleDownload(cert.code)}
+                            disabled={downloadingCert === cert.code}
+                          >
+                            {downloadingCert === cert.code ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <Download className="size-3" />
+                            )}
+                            {downloadingCert === cert.code ? 'Gerando...' : 'Baixar Certificado'}
+                          </Button>
                           {cert.url && (
                             <a
                               href={cert.url}

@@ -48,7 +48,14 @@ import {
   Mail
 } from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Tooltip,
@@ -108,6 +115,10 @@ export default function Classes() {
   const [studentSearch, setStudentSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'grade', direction: 'desc' });
+  const [releases, setReleases] = useState<any[]>([]);
+  const [availableExams, setAvailableExams] = useState<any[]>([]);
+  const [examToLink, setExamToLink] = useState('');
+  const [isLinking, setIsLinking] = useState(false);
 
   // Dispatch Modal State
   const [isDispatchOpen, setIsDispatchOpen] = useState(false);
@@ -130,13 +141,46 @@ export default function Classes() {
   const fetchClassDetails = async (id: string) => {
     setLoadingManage(true);
     try {
-      const { data } = await api.get(`/classes/${id}/students`);
-      setStudents(data.students);
-      setMetrics(data.metrics);
+      const [{ data: std }, { data: rel }, { data: exs }] = await Promise.all([
+        api.get(`/classes/${id}/students`),
+        api.get(`/classes/${id}/releases`),
+        api.get('/exams', { params: { search: '', status: 'PUBLISHED' } })
+      ]);
+      setStudents(std.students);
+      setMetrics(std.metrics);
+      setReleases(rel);
+      const boundIds = rel.map((r: any) => r.examId);
+      setAvailableExams(exs.data.filter((e: any) => !boundIds.includes(e.id)));
     } catch (e) {
       toast.error("Erro ao carregar detalhes da turma");
     } finally {
       setLoadingManage(false);
+    }
+  };
+
+  const handleLinkExam = async () => {
+    if (!examToLink) return toast.error("Selecione uma prova");
+    setIsLinking(true);
+    try {
+      await api.post(`/exams/${examToLink}/releases`, { classId: selectedClassId });
+      toast.success("Prova vinculada à turma!");
+      setExamToLink('');
+      if (selectedClassId) fetchClassDetails(selectedClassId);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Erro ao vincular prova");
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  const handleUnlinkExam = async (examId: string, releaseId: string) => {
+    if (!confirm("Remover o vínculo desta prova com a turma? Alunos com cooldown ativo e tentativas finalizadas não serão restritos, mas não terão liberação automática nova.")) return;
+    try {
+      await api.delete(`/exams/${examId}/releases/${releaseId}`);
+      toast.success("Vínculo removido");
+      if (selectedClassId) fetchClassDetails(selectedClassId);
+    } catch (err) {
+      toast.error("Erro ao remover vínculo");
     }
   };
 
@@ -431,6 +475,49 @@ export default function Classes() {
                 <div><p className="text-xs text-muted-foreground uppercase font-bold">Cooldown</p><p className="text-xl font-bold">{metrics?.cooldown || 0}</p></div>
               </CardContent>
             </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+             <Card className="bg-card shadow-sm border">
+               <CardHeader className="py-4 border-b">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-base font-bold flex items-center gap-2"><Target className="size-4 text-primary"/> Provas Vinculadas</CardTitle>
+                    <div className="flex gap-2">
+                       <Select value={examToLink} onValueChange={setExamToLink}>
+                         <SelectTrigger className="w-[180px] h-8 bg-muted/50"><SelectValue placeholder="Selecione a prova"/></SelectTrigger>
+                         <SelectContent>{availableExams.length ? availableExams.map(e => <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>) : <SelectItem disabled value="_">Nenhuma disp.</SelectItem>}</SelectContent>
+                       </Select>
+                       <Button size="sm" onClick={handleLinkExam} disabled={!examToLink || examToLink === '_' || isLinking}>
+                         {isLinking ? <Loader2 className="size-3 animate-spin"/> : 'Vincular'}
+                       </Button>
+                    </div>
+                  </div>
+               </CardHeader>
+               <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                       <TableRow>
+                          <TableHead className="px-4">Prova</TableHead>
+                          <TableHead className="w-20 px-4">Questões</TableHead>
+                          <TableHead className="w-16 px-4 text-right">Ação</TableHead>
+                       </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {releases.length === 0 ? (
+                           <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6 text-sm">Nenhuma prova liberada para esta turma no momento.</TableCell></TableRow>
+                        ) : releases.map(r => (
+                           <TableRow key={r.id}>
+                              <TableCell className="px-4 font-semibold text-sm">{r.exam.title}</TableCell>
+                              <TableCell className="px-4 text-muted-foreground text-sm">{r.exam.questionCount}q</TableCell>
+                              <TableCell className="px-4 text-right">
+                                 <Button variant="ghost" size="icon" className="text-red-600 size-8 hover:bg-red-500/10" onClick={() => handleUnlinkExam(r.examId, r.id)}><Trash2 className="size-4"/></Button>
+                              </TableCell>
+                           </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+               </CardContent>
+             </Card>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">

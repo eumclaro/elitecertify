@@ -1,6 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ArrowLeft, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ExamRelease {
   id: string;
@@ -153,106 +164,107 @@ export default function ExamReleases() {
   });
 
   return (
-    <div className="crud-page">
-      <div className="page-header" style={{ alignItems: 'flex-start' }}>
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-start">
         <div>
-          <button className="btn btn-sm btn-link" onClick={() => navigate('/admin/exams')} style={{ paddingLeft: 0, marginBottom: '0.5rem' }}>
-            ← Voltar para Provas
+          <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors" onClick={() => navigate('/admin/exams')}>
+            <ArrowLeft className="size-4" /> Voltar para Provas
           </button>
-          <h2>Liberações: {exam.title}</h2>
-          <p>Gerencie quais turmas e alunos individuais podem acessar esta prova.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Liberações: {exam.title}</h1>
+          <p className="text-muted-foreground mt-2">Gerencie quais turmas e alunos individuais podem acessar esta prova.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '1.5rem' }}>
-           <input 
-              type="checkbox" 
+        <div className="flex items-center gap-2 mt-10">
+           <Checkbox 
               id="showOnly" 
               checked={showOnlyReleased} 
-              onChange={e => setShowOnlyReleased(e.target.checked)} 
-              style={{ width: '18px', height: '18px' }}
+              onCheckedChange={(c) => setShowOnlyReleased(c === true)} 
            />
-           <label htmlFor="showOnly" style={{ cursor: 'pointer', margin: 0 }}>Mostrar apenas liberados</label>
+           <label htmlFor="showOnly" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+             Mostrar apenas liberados
+           </label>
         </div>
       </div>
 
-      <div className="tabs" style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid #374151', marginBottom: '1.5rem' }}>
+      <div className="flex border-b mb-6">
         <button 
-          className={`tab-btn ${activeTab === 'classes' ? 'active' : ''}`}
+          className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'classes' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           onClick={() => { setActiveTab('classes'); setSearch(''); }}
-          style={{ padding: '0.75rem 1.5rem', background: 'none', border: 'none', color: activeTab === 'classes' ? '#a78bfa' : '#9ca3af', borderBottom: activeTab === 'classes' ? '2px solid #a78bfa' : '2px solid transparent', cursor: 'pointer', fontWeight: 'bold' }}
         >
           Turmas
         </button>
         <button 
-          className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}
+          className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'students' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           onClick={() => { setActiveTab('students'); setSearch(''); }}
-          style={{ padding: '0.75rem 1.5rem', background: 'none', border: 'none', color: activeTab === 'students' ? '#a78bfa' : '#9ca3af', borderBottom: activeTab === 'students' ? '2px solid #a78bfa' : '2px solid transparent', cursor: 'pointer', fontWeight: 'bold' }}
         >
           Alunos Individuais
         </button>
       </div>
 
-      <div className="search-bar" style={{ marginBottom: '1rem' }}>
-        <input
-          type="text" 
-          placeholder={activeTab === 'classes' ? 'Buscar turma por nome...' : 'Buscar aluno por nome...'}
-          value={search} 
-          onChange={e => setSearch(e.target.value)}
-        />
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder={activeTab === 'classes' ? 'Buscar turma por nome...' : 'Buscar aluno por nome...'}
+            value={search} 
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9 h-11 bg-muted/50"
+          />
+        </div>
       </div>
 
-      <div className="table-wrapper">
-        <table>
-          <thead>
+      <div className="bg-card rounded-xl border overflow-hidden mt-6">
+        <Table>
+          <TableHeader className="bg-muted/30">
             {activeTab === 'classes' ? (
-              <tr>
-                <th>Nome da Turma</th>
-                <th>Qtd. Alunos</th>
-                <th style={{ width: '120px' }}>Acesso</th>
-                <th style={{ width: '150px', textAlign: 'right' }}>Ação Rápida</th>
-              </tr>
+              <TableRow>
+                <TableHead className="px-6">Nome da Turma</TableHead>
+                <TableHead className="px-6">Qtd. Alunos</TableHead>
+                <TableHead className="w-32 px-6">Acesso</TableHead>
+                <TableHead className="w-40 px-6 text-right">Ação Rápida</TableHead>
+              </TableRow>
             ) : (
-              <tr>
-                <th>Nome do Aluno</th>
-                <th>Email</th>
-                <th>Tentativas</th>
-                <th>Último Resultado</th>
-                <th>Cooldown</th>
-                <th style={{ width: '120px' }}>Acesso</th>
-                <th style={{ width: '150px', textAlign: 'right' }}>Ação Rápida</th>
-              </tr>
+              <TableRow>
+                <TableHead className="px-6">Nome do Aluno</TableHead>
+                <TableHead className="px-6">Email</TableHead>
+                <TableHead className="px-6">Tentativas</TableHead>
+                <TableHead className="px-6">Último Resultado</TableHead>
+                <TableHead className="px-6">Cooldown</TableHead>
+                <TableHead className="w-32 px-6">Acesso</TableHead>
+                <TableHead className="w-40 px-6 text-right">Ação Rápida</TableHead>
+              </TableRow>
             )}
-          </thead>
-          <tbody>
+          </TableHeader>
+          <TableBody>
             {activeTab === 'classes' ? (
               filteredClasses.length === 0 ? (
-                <tr><td colSpan={4} className="empty-text">Nenhuma turma encontrada.</td></tr>
+                <TableRow><TableCell colSpan={4} className="empty-text text-center py-6 text-muted-foreground">Nenhuma turma encontrada.</TableCell></TableRow>
               ) : filteredClasses.map(c => {
                 const isReleased = exam.releases.some(r => r.classId === c.id);
                 return (
-                  <tr key={c.id}>
-                    <td><strong>{c.name}</strong></td>
-                    <td>{c._count?.students || 0} alunos</td>
-                    <td>
+                  <TableRow key={c.id}>
+                    <TableCell className="px-6 font-semibold">{c.name}</TableCell>
+                    <TableCell className="px-6 text-muted-foreground">{c._count?.students || 0} alunos</TableCell>
+                    <TableCell className="px-6">
                       {isReleased 
-                        ? <span className="badge badge-success">Liberado</span> 
-                        : <span className="badge badge-secondary">Bloqueado</span>}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
+                        ? <span className="badge badge-success px-2 py-1 bg-green-500/10 text-green-500 rounded-md text-xs font-bold border border-green-500/20">Liberado</span> 
+                        : <span className="badge badge-secondary px-2 py-1 bg-slate-500/10 text-slate-500 rounded-md text-xs font-bold border border-slate-500/20">Bloqueado</span>}
+                    </TableCell>
+                    <TableCell className="px-6 text-right">
                       <button 
-                        className={`btn btn-sm ${isReleased ? 'btn-danger' : 'btn-primary'}`}
+                        className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-colors ${isReleased ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20' : 'bg-primary/10 text-primary hover:bg-primary/20'}`}
                         onClick={() => toggleReleaseClass(c)}
                         disabled={actionLoading === c.id}
                         style={{ minWidth: '80px' }}
                       >
                         {actionLoading === c.id ? '...' : (isReleased ? 'Revogar' : 'Liberar')}
                       </button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })
             ) : (
               filteredStudents.length === 0 ? (
-                <tr><td colSpan={4} className="empty-text">Nenhum aluno encontrado.</td></tr>
+                <TableRow><TableCell colSpan={7} className="empty-text text-center py-6 text-muted-foreground">Nenhum aluno encontrado.</TableCell></TableRow>
               ) : filteredStudents.map(s => {
                 const isExplicitlyReleased = exam.releases.some(r => r.studentId === s.id);
                 const releasedClassIds = exam.releases.filter(r => r.classId).map(r => r.classId);
@@ -265,62 +277,62 @@ export default function ExamReleases() {
                 const activeCooldown = exam.cooldowns.find(c => c.studentId === s.id);
 
                 return (
-                  <tr key={s.id}>
-                    <td><strong>{s.user?.name}</strong></td>
-                    <td>{s.user?.email}</td>
-                    <td style={{ textAlign: 'center' }}>
+                  <TableRow key={s.id}>
+                    <TableCell className="px-6 font-semibold">{s.user?.name}</TableCell>
+                    <TableCell className="px-6 text-muted-foreground">{s.user?.email}</TableCell>
+                    <TableCell className="px-6 text-center text-muted-foreground text-sm">
                       <span className={`badge ${attemptsCount >= (exam.maxAttempts || Infinity) ? 'badge-warning' : 'badge-secondary'}`}>
                         {attemptsCount} {exam.maxAttempts > 0 ? `/ ${exam.maxAttempts}` : ''}
                       </span>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell className="px-6 text-sm">
                       {latestAttempt ? (
-                        <div>
-                          {latestAttempt.resultStatus === 'PASSED' && <span className="badge badge-success">Aprovado ({latestAttempt.score}%)</span>}
-                          {latestAttempt.resultStatus === 'FAILED' && <span className="badge badge-danger">Reprovado ({latestAttempt.score}%)</span>}
-                          {latestAttempt.resultStatus === 'PENDING' && <span className="badge badge-warning">Em andamento</span>}
-                          {latestAttempt.resultStatus === 'FAILED_TIMEOUT' && <span className="badge badge-danger">Tempo Esgotado</span>}
-                          {latestAttempt.resultStatus === 'FAILED_ABANDONMENT' && <span className="badge badge-danger">Abandonada</span>}
+                        <div className="flex gap-2">
+                          {latestAttempt.resultStatus === 'PASSED' && <span className="text-green-500 font-medium">Aprovado ({latestAttempt.score}%)</span>}
+                          {latestAttempt.resultStatus === 'FAILED' && <span className="text-red-500 font-medium">Reprovado ({latestAttempt.score}%)</span>}
+                          {latestAttempt.resultStatus === 'PENDING' && <span className="text-yellow-500 font-medium">Em andamento</span>}
+                          {latestAttempt.resultStatus === 'FAILED_TIMEOUT' && <span className="text-red-500 font-medium">Tempo Esgotado</span>}
+                          {latestAttempt.resultStatus === 'FAILED_ABANDONMENT' && <span className="text-red-500 font-medium">Abandonada</span>}
                         </div>
-                      ) : <span style={{ color: '#6b7280' }}>Não iniciou</span>}
-                    </td>
-                    <td>
+                      ) : <span className="text-muted-foreground">Não iniciou</span>}
+                    </TableCell>
+                    <TableCell className="px-6 text-sm">
                       {activeCooldown ? (
-                        <span className="badge badge-warning" title={`Até ${new Date(activeCooldown.endsAt).toLocaleString('pt-BR')}`}>
+                        <span className="text-orange-500 font-medium" title={`Até ${new Date(activeCooldown.endsAt).toLocaleString('pt-BR')}`}>
                           Bloqueado (CD)
                         </span>
-                      ) : <span style={{ color: '#6b7280' }}>-</span>}
-                    </td>
-                    <td>
+                      ) : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+                    <TableCell className="px-6">
                       {isReleased 
-                        ? <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                            <span className="badge badge-success" title={releasedViaClass ? `Acesso via: ${releasedViaClass.class.name}` : 'Acesso Individual'}>
+                        ? <div className="flex flex-col gap-1 items-start">
+                            <span className="px-2 py-0.5 bg-green-500/10 text-green-500 rounded text-xs font-bold border border-green-500/20" title={releasedViaClass ? `Acesso via: ${releasedViaClass.class.name}` : 'Acesso Individual'}>
                               Liberado
                             </span>
                             {releasedViaClass && (
-                              <span style={{ fontSize: '0.7rem', color: '#9ca3af', lineHeight: 1 }} title={releasedViaClass.class.name}>
+                              <span className="text-[10px] text-muted-foreground" title={releasedViaClass.class.name}>
                                 via Turma
                               </span>
                             )}
                           </div>
-                        : <span className="badge badge-secondary">Bloqueado</span>}
-                    </td>
-                    <td style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        : <span className="px-2 py-0.5 bg-slate-500/10 text-slate-500 rounded text-xs font-bold border border-slate-500/20">Bloqueado</span>}
+                    </TableCell>
+                    <TableCell className="px-6 text-right">
                       <button 
-                        className={`btn btn-sm ${isExplicitlyReleased ? 'btn-danger' : 'btn-primary'}`}
+                        className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-colors ${isExplicitlyReleased ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20' : 'bg-primary/10 text-primary hover:bg-primary/20'}`}
                         onClick={() => toggleReleaseStudent(s)}
                         disabled={actionLoading === s.id}
                         style={{ minWidth: '80px' }}
                       >
                         {actionLoading === s.id ? '...' : (isExplicitlyReleased ? 'Revogar' : 'Liberar')}
                       </button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {/* Custom Confirm Modal for Revoking Access */}

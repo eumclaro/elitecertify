@@ -239,4 +239,22 @@ router.put('/:id/students', authMiddleware, requireRole('ADMIN'), async (req: Re
   }
 });
 
+// GET /api/classes/:id/releases — List exam releases bound to this class
+router.get('/:id/releases', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const classId = req.params.id as string;
+    const releases = await prisma.examRelease.findMany({
+      where: { classId },
+      include: {
+        exam: { select: { id: true, title: true, status: true, questionCount: true, durationMinutes: true, certificateTemplateId: true } }
+      },
+      orderBy: { releasedAt: 'desc' }
+    });
+    return res.json(releases);
+  } catch (error) {
+    console.error('List class releases error:', error);
+    return res.status(500).json({ error: 'Erro ao buscar liberações da turma' });
+  }
+});
+
 export default router;

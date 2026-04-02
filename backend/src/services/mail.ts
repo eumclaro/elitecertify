@@ -68,7 +68,7 @@ export async function getActiveTransport() {
       }
     };
     process.env.RUNTIME_SMTP_FROM = parsed.fromEmail 
-      ? `"${parsed.fromName || 'ELT Training'}" <${parsed.fromEmail}>` 
+      ? `"${parsed.fromName || 'Elite Certify'}" <${parsed.fromEmail}>` 
       : '';
   } else {
     // Fallback absoluto pro .env (caso nenhuma definicao de painel exista)
@@ -81,7 +81,7 @@ export async function getActiveTransport() {
         pass: process.env.SMTP_PASS || '',
       },
     };
-    process.env.RUNTIME_SMTP_FROM = process.env.SMTP_FROM || '"ELT Training" <no-reply@elt.com.br>';
+    process.env.RUNTIME_SMTP_FROM = process.env.SMTP_FROM || '"Elite Certify" <no-reply@elt.com.br>';
   }
 
   cachedSmtpConfig = transportParams;
@@ -106,7 +106,7 @@ interface InternalMailOptions {
 export async function sendMail(options: InternalMailOptions) {
   try {
     const transporter = await getActiveTransport();
-    const from = process.env.RUNTIME_SMTP_FROM || '"ELT Training" <no-reply@elt.com.br>';
+    const from = process.env.RUNTIME_SMTP_FROM || '"Elite Certify" <no-reply@elt.com.br>';
 
     const info = await transporter.sendMail({
       from,
@@ -242,6 +242,52 @@ export async function sendPasswordResetEmail(name: string, email: string, resetL
     EMAIL: email,
     RESET_LINK: resetLink,
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
+  });
+}
+
+export async function sendInviteEmail(name: string, email: string, role: string, inviteLink: string) {
+  const roleLabel = role === 'SUPER_ADMIN' ? 'Super Administrador' : (role === 'ADMIN' ? 'Administrador' : 'Visualizador');
+  
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f9fafb;border-radius:12px;border:1px solid #e5e7eb;">
+      <div style="text-align:center;margin-bottom:32px;">
+        <h1 style="color:#111827;font-size:24px;margin:0;">Elite Certify</h1>
+      </div>
+      
+      <h2 style="color:#111827;font-size:20px;margin-bottom:16px;">Olá, ${name}!</h2>
+      
+      <p style="color:#4b5563;font-size:16px;line-height:24px;margin-bottom:24px;">
+        Você foi convidado para acessar a plataforma <strong>Elite Certify</strong> como <strong>${roleLabel}</strong>.
+      </p>
+      
+      <p style="color:#4b5563;font-size:16px;line-height:24px;margin-bottom:32px;">
+        Clique no link abaixo para criar sua senha e ativar sua conta:
+      </p>
+      
+      <div style="text-align:center;margin-bottom:32px;">
+        <a href="${inviteLink}" 
+           style="background-color:#111827;color:#ffffff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">
+          Ativar Minha Conta
+        </a>
+      </div>
+      
+      <p style="color:#6b7280;font-size:14px;line-height:20px;margin-bottom:16px;">
+        Este link expira em <strong>48 horas</strong>.
+      </p>
+      
+      <hr style="border:0;border-top:1px solid #e5e7eb;margin:32px 0;" />
+      
+      <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">
+        Se você não esperava por este convite, pode ignorar este e-mail com segurança.
+      </p>
+    </div>
+  `;
+
+  return sendMail({
+    to: email,
+    subject: 'Você foi convidado para acessar o Elite Certify',
+    html,
+    type: 'ADMIN_INVITE'
   });
 }
 

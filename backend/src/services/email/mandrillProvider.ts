@@ -40,7 +40,7 @@ export class MandrillProvider implements IEmailProvider {
     const message: any = {
       to: [{ email: options.toEmail, name: options.toName, type: 'to' }],
       html: renderedHtml,
-      subject: options.subject || 'Notificação - ELT Training',
+      subject: options.subject || 'Notificação - Elite Certify',
       merge_language: 'mailchimp',
     };
 

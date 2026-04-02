@@ -23,6 +23,8 @@ model User {
   resetToken        String?         @map("reset_token")
   resetTokenExpires DateTime?       @map("reset_token_expires")
   avatarUrl         String?         @map("avatar_url")
+  inviteToken       String?         @unique @map("invite_token")
+  inviteExpires     DateTime?       @map("invite_expires")
   auditEvents       AuditEvent[]
   npsSurveys        NpsSurvey[]
   student           Student?

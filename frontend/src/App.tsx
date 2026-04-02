@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import CreatePassword from './pages/CreatePassword';
 import Dashboard from './pages/admin/Dashboard';
 import Students from './pages/admin/Students';
 import Exams from './pages/admin/Exams';
@@ -40,6 +41,7 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to={user.role === 'STUDENT' ? '/student/exams' : '/admin'} replace /> : <Login />} />
       <Route path="/forgot-password" element={user ? <Navigate to={user.role === 'STUDENT' ? '/student/exams' : '/admin'} replace /> : <ForgotPassword />} />
       <Route path="/reset-password" element={user ? <Navigate to={user.role === 'STUDENT' ? '/student/exams' : '/admin'} replace /> : <ResetPassword />} />
+      <Route path="/criar-senha" element={user ? <Navigate to={user.role === 'STUDENT' ? '/student/exams' : '/admin'} replace /> : <CreatePassword />} />
 
       {/* Admin Routes */}
       <Route path="/admin" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
@@ -76,13 +78,19 @@ function AppRoutes() {
   );
 }
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient();
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-        <Toaster richColors closeButton position="top-right" />
-      </AuthProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+          <Toaster richColors closeButton position="top-right" />
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }

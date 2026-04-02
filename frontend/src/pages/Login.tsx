@@ -59,7 +59,7 @@ export default function Login() {
           <img 
              src="/logotipo-elite-training.png" 
              className="h-16 opacity-30 grayscale mix-blend-overlay max-w-[80%]" 
-             alt="Elite Training Logo Fallback" 
+             alt="Elite Certify Logo Fallback" 
           />
         )}
       </div>
@@ -71,7 +71,7 @@ export default function Login() {
           <div className="mb-10 text-center">
              <img 
               src="/logotipo-elite-training.png" 
-              alt="Elite Training Logo" 
+              alt="Elite Certify Logo" 
               className="h-14 w-auto object-contain mx-auto mb-6" 
             />
             <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Bem-vindo de volta</h1>

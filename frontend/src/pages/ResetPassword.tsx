@@ -64,7 +64,7 @@ export default function ResetPassword() {
       <div className="login-card">
         <div className="login-header">
           <div className="login-logo">
-            <img src="/logotipo-elite-training.png" alt="Elite Training" className="login-logo-img" />
+            <img src="/logotipo-elite-training.png" alt="Elite Certify" className="login-logo-img" />
           </div>
           <p>Criar Nova Senha</p>
         </div>

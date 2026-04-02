@@ -3,8 +3,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 import { env } from '../config/env';
-import { authMiddleware, AuthPayload } from '../middleware/auth';
+import { authMiddleware, AuthPayload, requireRole } from '../middleware/auth';
 import { getClientInfo } from '../middleware/audit';
+import { checkPermission } from '../middlewares/checkPermission';
 import { sendPasswordResetEmail } from '../services/mail';
 import crypto from 'crypto';
 import multer from 'multer';
@@ -410,6 +411,130 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
     return res.json({ message: 'Logout realizado com sucesso' });
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao fazer logout' });
+  }
+});
+
+// ==========================================
+// TEAM & INVITE MANAGEMENT
+// ==========================================
+
+// PUT /api/auth/team/:id/password — Redefinir senha da equipe (SUPER_ADMIN apenas)
+router.put('/team/:id/password', authMiddleware, requireRole('SUPER_ADMIN'), checkPermission('canManageAdmins'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { newPassword, confirmPassword } = req.body;
+
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({ error: 'Novas senhas são obrigatórias.' });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ error: 'As senhas não coincidem.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: id as string } });
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: id as string },
+      data: { passwordHash, sessionToken: null } // Desloga o usuário por segurança
+    });
+
+    const { ip, device } = getClientInfo(req);
+    await prisma.auditEvent.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'TEAM_PASSWORD_RESET',
+        entity: 'user',
+        entityId: id as string,
+        ip,
+        device,
+        metadata: `Password reset by admin ${req.user!.userId}`
+      }
+    });
+
+    return res.json({ message: 'Senha redefinida com sucesso!' });
+  } catch (err) {
+    console.error('[Team Password Reset Error]', err);
+    return res.status(500).json({ error: 'Erro ao redefinir senha.' });
+  }
+});
+
+// GET /api/auth/invite/validate — Validar Token de Convite
+router.get('/invite/validate', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ error: 'Token obrigatório.' });
+
+    const user = await prisma.user.findFirst({
+      where: {
+        // @ts-ignore
+        inviteToken: token as string,
+        // @ts-ignore
+        inviteExpires: { gt: new Date() },
+        active: false
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Link de convite inválido ou expirado.' });
+    }
+
+    return res.json({ name: user.name, email: user.email });
+  } catch (err) {
+    return res.status(500).json({ error: 'Erro ao validar convite.' });
+  }
+});
+
+// POST /api/auth/invite/activate — Ativar conta com nova senha
+router.post('/invite/activate', async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ error: 'Dados obrigatórios.' });
+
+    const user = await prisma.user.findFirst({
+      where: {
+        // @ts-ignore
+        inviteToken: token as string,
+        // @ts-ignore
+        inviteExpires: { gt: new Date() },
+        active: false
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Token inválido ou expirado.' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        active: true,
+        // @ts-ignore
+        inviteToken: null,
+        // @ts-ignore
+        inviteExpires: null
+      }
+    });
+
+    const { ip, device } = getClientInfo(req);
+    await prisma.auditEvent.create({
+      data: {
+        userId: user.id,
+        action: 'INVITE_ACTIVATED',
+        entity: 'user',
+        entityId: user.id,
+        ip,
+        device
+      }
+    });
+
+    return res.json({ message: 'Sua conta foi ativada com sucesso! Você já pode fazer login.' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Erro ao ativar conta.' });
   }
 });
 

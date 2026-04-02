@@ -22,7 +22,7 @@ export interface EmailContent {
 }
 
 const BRANDING = {
-  platformName: 'ELT Training',
+  platformName: 'Elite Certify',
   platformUrl: env.FRONTEND_URL || 'https://app.elt.com.br',
   supportEmail: 'suporte@elitetraining.com.br',
   whatsapp: '+55 11 99999-9999',

@@ -89,7 +89,7 @@ export function AppSidebar() {
         <Link to={isAdmin ? "/admin" : "/student/exams"} className="flex flex-col items-center group-data-[state=expanded]:items-start justify-center h-full w-full hover:opacity-80 transition-all flex-shrink-0 group-data-[state=expanded]:px-3">
           <img 
             src="/logotipo-elite-black.png" 
-            alt="Elite Logo" 
+            alt="Elite Certify Logo" 
             className="w-auto h-8 group-data-[state=expanded]:h-10 transition-all duration-300 object-contain mx-auto group-data-[state=expanded]:mx-0" 
           />
           <span className="text-[10px] leading-tight text-muted-foreground uppercase tracking-widest font-bold opacity-80 mt-1.5 whitespace-nowrap group-data-[state=collapsed]:hidden transition-opacity">

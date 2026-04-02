@@ -123,7 +123,7 @@ router.post('/mandrill/test', authMiddleware, requireRole('ADMIN'), async (req: 
         PASSWORD: '----',
         SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
       },
-      htmlContent: `<h1>Teste de Conexão</h1><p>Olá ${user.name}, o seu servidor SMTP (Mandrill) está funcionando corretamente via ELT CERT.</p><p>Data: ${dummyAt}</p>`
+      htmlContent: `<h1>Teste de Conexão</h1><p>Olá ${user.name}, o seu servidor SMTP (Mandrill) está funcionando corretamente via Elite Certify.</p><p>Data: ${dummyAt}</p>`
     });
 
     return res.json({ message: 'Conexão com Mandrill validada! Template de boas-vindas enviado para seu e-mail.' });

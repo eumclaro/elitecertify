@@ -78,7 +78,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 app.listen(env.PORT, () => {
-  console.log(`🚀 ELT CERT API running on port ${env.PORT}`);
+  console.log(`🚀 Elite Certify API running on port ${env.PORT}`);
   console.log(`📚 Environment: ${env.NODE_ENV}`);
   console.log(`🌐 Frontend URL: ${env.FRONTEND_URL}`);
   console.log(`🔗 Production URL: ${env.PRODUCTION_URL}`);

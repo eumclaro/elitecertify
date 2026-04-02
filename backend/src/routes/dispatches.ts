@@ -340,7 +340,7 @@ router.get('/:id/export', authMiddleware, requireRole('ADMIN'), async (req: Requ
       doc.fontSize(10)
          .font('Helvetica')
          .fillColor('#666')
-         .text('ELT CERT', 200, 70, { align: 'right' });
+         .text('Elite Certify', 200, 70, { align: 'right' });
 
       doc.moveTo(50, 100).lineTo(545, 100).strokeColor('#eeeeee').lineWidth(1).stroke();
       doc.moveDown(2);
@@ -432,7 +432,7 @@ router.get('/:id/export', authMiddleware, requireRole('ADMIN'), async (req: Requ
         const footerY = 800;
         doc.moveTo(50, footerY - 5).lineTo(545, footerY - 5).strokeColor('#eeeeee').lineWidth(0.5).stroke();
         doc.fontSize(7).fillColor('#999999');
-        doc.text(`ELT CERT — Relatório gerado em ${new Date().toLocaleString('pt-BR')}`, 50, footerY);
+        doc.text(`Elite Certify — Relatório gerado em ${new Date().toLocaleString('pt-BR')}`, 50, footerY);
         doc.text(`Página ${i + 1} de ${pages.count}`, 50, footerY, { align: 'right' });
       }
 

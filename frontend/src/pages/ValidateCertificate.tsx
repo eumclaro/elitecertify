@@ -57,7 +57,7 @@ export default function ValidateCertificate() {
           <ShieldCheck className="size-8 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 uppercase italic">ELT CERT</h1>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 uppercase italic">Elite Certify</h1>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Portal de Autenticidade</p>
         </div>
       </div>
@@ -135,7 +135,7 @@ export default function ValidateCertificate() {
                   <Badge variant="outline" className="w-fit bg-slate-50 text-slate-600 border-slate-200">
                     Status: Original
                   </Badge>
-                  <p className="text-[10px] text-slate-400 italic">Este certificado foi emitido eletronicamente pela ELT CERT.</p>
+                  <p className="text-[10px] text-slate-400 italic">Este certificado foi emitido eletronicamente pela Elite Certify.</p>
                 </div>
                 
                 <Button variant="ghost" size="sm" asChild className="gap-2 text-slate-600 hover:text-primary group">
@@ -151,7 +151,7 @@ export default function ValidateCertificate() {
 
       {/* Footer Info */}
       <p className="mt-8 text-slate-400 text-[10px] font-medium tracking-[0.2em] uppercase">
-        &copy; {new Date().getFullYear()} ELT CERT &bull; Elite Training Global
+        &copy; {new Date().getFullYear()} Elite Certify &bull; Elite Training Global
       </p>
     </div>
   );

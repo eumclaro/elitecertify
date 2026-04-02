@@ -11,7 +11,6 @@ import {
   UserCircle,
   LogOut,
   ChevronUp,
-  Search,
   Send,
   CalendarDays,
   Medal,
@@ -29,6 +28,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
@@ -61,6 +61,7 @@ export function AppSidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { setOpen } = useSidebar();
   const isAdmin = user?.role === 'ADMIN';
 
   const navLinks = isAdmin ? adminLinks : studentLinks;
@@ -76,36 +77,28 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" variant="sidebar">
-      <SidebarHeader className="border-b border-sidebar-border h-16 flex items-center px-4">
-        <Link to={isAdmin ? "/admin" : "/student/exams"} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="flex aspect-square size-9 items-center justify-center overflow-hidden rounded-lg">
-            <img 
-              src="/logotipo-elite-training.png" 
-              alt="Elite Training Logo" 
-              className="size-full object-contain" 
-            />
-          </div>
-          <div className="flex flex-col gap-0.5 leading-none group-data-[collapsible=icon]:hidden">
-            <span className="font-bold text-[15px] tracking-tight">ELT CERT</span>
-            <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold opacity-80">Portal {isAdmin ? 'Admin' : 'Aluno'}</span>
-          </div>
+    <Sidebar 
+      collapsible="icon" 
+      variant="sidebar"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      className="transition-all duration-300"
+    >
+      <SidebarHeader className="border-b border-sidebar-border h-20 flex items-center justify-center px-2 overflow-hidden">
+        <Link to={isAdmin ? "/admin" : "/student/exams"} className="flex flex-col items-center group-data-[state=expanded]:items-start justify-center h-full w-full hover:opacity-80 transition-all flex-shrink-0 group-data-[state=expanded]:px-3">
+          <img 
+            src="/logotipo-elite-black.png" 
+            alt="Elite Logo" 
+            className="w-auto h-8 group-data-[state=expanded]:h-10 transition-all duration-300 object-contain mx-auto group-data-[state=expanded]:mx-0" 
+          />
+          <span className="text-[10px] leading-tight text-muted-foreground uppercase tracking-widest font-bold opacity-80 mt-1.5 whitespace-nowrap group-data-[state=collapsed]:hidden transition-opacity">
+            Portal {isAdmin ? 'Admin' : 'Aluno'}
+          </span>
         </Link>
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <div className="px-2 py-4 group-data-[collapsible=icon]:hidden">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Buscar..."
-                className="w-full bg-muted/50 rounded-md py-2 pl-9 pr-4 text-sm outline-none focus:ring-1 focus:ring-ring transition-all"
-              />
-            </div>
-          </div>
-          
+        <SidebarGroup>          
           <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
             {isAdmin ? 'Gestão de Certificação' : 'Área de Estudo'}
           </SidebarGroupLabel>

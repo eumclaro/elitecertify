@@ -17,7 +17,7 @@ const daysFrom = (n: number) => new Date(Date.now() + n * 86_400_000)
 const cert = () => `ELT-${randomUUID().slice(0, 8).toUpperCase()}`
 
 async function main() {
-  console.log('🌱  Iniciando seed ELT CERT...\n')
+  console.log('🌱  Iniciando seed Elite Certify...\n')
 
   // ─── 1. ADMIN ──────────────────────────────────────────────────────────────
   console.log('👤  Criando admin...')

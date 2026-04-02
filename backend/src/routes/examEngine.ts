@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 import { getClientInfo } from '../middleware/audit';
 import { sendExamPassedEmail, sendExamFailedEmail, sendExamAbandonedEmail } from '../services/mail';
 import { v4 as uuid } from 'uuid';

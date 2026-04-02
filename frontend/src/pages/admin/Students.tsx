@@ -61,6 +61,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
+import { usePermission } from '../../hooks/usePermission';
 
 interface Student {
   id: string;
@@ -93,6 +94,7 @@ export default function Students() {
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const { hasPermission } = usePermission();
   
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
@@ -321,14 +323,18 @@ export default function Students() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => setShowImportModal(true)}>
-            <Download className="mr-2 h-4 w-4" />
-            Importar CSV
-          </Button>
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Aluno
-          </Button>
+          {hasPermission('canCreate') && (
+            <>
+              <Button variant="outline" onClick={() => setShowImportModal(true)}>
+                <Download className="mr-2 h-4 w-4" />
+                Importar CSV
+              </Button>
+              <Button onClick={openCreate}>
+                <Plus className="mr-2 h-4 w-4" />
+                Novo Aluno
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -409,26 +415,42 @@ export default function Students() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuLabel className="text-[10px] font-bold uppercase opacity-40 px-3 py-1.5 tracking-wider">Gestão do Aluno</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => openDataModal(s)}>
-                              <CreditCard className="mr-2 size-4" /> Dados Pessoais
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openClassesModal(s)}>
-                              <School className="mr-2 size-4" /> Matricular
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openCooldowns(s)}>
-                              <ShieldCheck className="mr-2 size-4" /> Ver Cooldowns
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setConfirmResend(s)}>
-                              <Mail className="mr-2 size-4" /> Reenviar Acesso
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openEdit(s)}>
-                              <Edit2 className="mr-2 size-4" /> Editar Aluno
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setConfirmDelete(s)} className="text-destructive focus:text-destructive">
-                              <Trash2 className="mr-2 size-4" /> Excluir
-                            </DropdownMenuItem>
+                            
+                            {hasPermission('canEdit') && (
+                              <>
+                                <DropdownMenuItem onClick={() => openDataModal(s)}>
+                                  <CreditCard className="mr-2 size-4" /> Dados Pessoais
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openClassesModal(s)}>
+                                  <School className="mr-2 size-4" /> Matricular
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openCooldowns(s)}>
+                                  <ShieldCheck className="mr-2 size-4" /> Ver Cooldowns
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            )}
+
+                            {hasPermission('canSendEmails') && (
+                              <DropdownMenuItem onClick={() => setConfirmResend(s)}>
+                                <Mail className="mr-2 size-4" /> Reenviar Acesso
+                              </DropdownMenuItem>
+                            )}
+
+                            {hasPermission('canEdit') && (
+                              <DropdownMenuItem onClick={() => openEdit(s)}>
+                                <Edit2 className="mr-2 size-4" /> Editar Aluno
+                              </DropdownMenuItem>
+                            )}
+
+                            {hasPermission('canDelete') && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => setConfirmDelete(s)} className="text-destructive focus:text-destructive">
+                                  <Trash2 className="mr-2 size-4" /> Excluir
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -510,7 +532,9 @@ export default function Students() {
                           <Badge variant="warning" className="text-[10px]">Bloqueado</Badge>
                         </TableCell>
                         <TableCell className="text-right px-6">
-                           <Button size="sm" variant="destructive" onClick={() => setConfirmCooldown(entry)}>Liberar</Button>
+                           {hasPermission('canDelete') && (
+                             <Button size="sm" variant="destructive" onClick={() => setConfirmCooldown(entry)}>Liberar</Button>
+                           )}
                         </TableCell>
                       </TableRow>
                     ))
@@ -758,7 +782,9 @@ export default function Students() {
                           {new Date(c.endsAt).toLocaleDateString()} às {new Date(c.endsAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" variant="destructive" onClick={() => setConfirmCooldown(c)}>Liberar</Button>
+                          {hasPermission('canDelete') && (
+                            <Button size="sm" variant="destructive" onClick={() => setConfirmCooldown(c)}>Liberar</Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

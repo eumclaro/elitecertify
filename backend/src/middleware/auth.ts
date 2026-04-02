@@ -6,7 +6,7 @@ import prisma from '../config/database';
 export interface AuthPayload {
   userId: string;
   email: string;
-  role: 'ADMIN' | 'STUDENT';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'VIEWER' | 'STUDENT';
 }
 
 declare global {
@@ -49,7 +49,13 @@ export function requireRole(...roles: string[]) {
     if (!req.user) {
       return res.status(401).json({ error: 'Não autenticado' });
     }
-    if (!roles.includes(req.user.role)) {
+    
+    let allowedRoles = [...roles];
+    if (roles.includes('ADMIN')) {
+      allowedRoles.push('SUPER_ADMIN', 'VIEWER');
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Sem permissão para acessar este recurso' });
     }
     next();

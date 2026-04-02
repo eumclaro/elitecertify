@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 import { EmailEventKey } from '../constants/emailEvents';
 
 const router = Router();
@@ -32,7 +33,7 @@ router.get('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 });
 
 // POST /api/internal-templates
-router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { name, description, htmlContent, mergeVars, status } = req.body;
     const template = await prisma.internalTemplate.create({
@@ -51,7 +52,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 });
 
 // PUT /api/internal-templates/:id
-router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { name, description, htmlContent, mergeVars, status } = req.body;
@@ -72,7 +73,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 });
 
 // DELETE /api/internal-templates/:id
-router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await prisma.internalTemplate.delete({ where: { id: id as string } });

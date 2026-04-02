@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 import { encrypt } from '../utils/crypto';
 import nodemailer from 'nodemailer';
 import { getEmailProvider } from '../services/mail';
@@ -52,7 +53,7 @@ router.get('/smtp', authMiddleware, requireRole('ADMIN'), async (req: Request, r
 });
 
 // PUT /api/settings/smtp
-router.put('/smtp', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/smtp', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { host, port, user, pass, fromEmail, fromName } = req.body;
     
@@ -83,7 +84,7 @@ router.put('/smtp', authMiddleware, requireRole('ADMIN'), async (req: Request, r
 });
 
 // POST /api/settings/smtp/test
-router.post('/smtp/test', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/smtp/test', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { host, port, user, pass, fromEmail, fromName } = req.body;
     let fallbackPass = pass;
@@ -123,7 +124,7 @@ router.post('/smtp/test', authMiddleware, requireRole('ADMIN'), async (req: Requ
 });
 
 // POST /api/settings/mandrill/test
-router.post('/mandrill/test', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/mandrill/test', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
@@ -166,7 +167,7 @@ router.get('/login-cover', async (req: Request, res: Response) => {
 });
 
 // POST /api/settings/login-cover
-router.post('/login-cover', authMiddleware, requireRole('ADMIN'), upload.single('file'), async (req: Request, res: Response) => {
+router.post('/login-cover', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), upload.single('file'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });

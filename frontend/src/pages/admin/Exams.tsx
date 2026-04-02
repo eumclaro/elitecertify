@@ -53,6 +53,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { usePermission } from '../../hooks/usePermission';
 
 interface ExamRelease {
   id: string;
@@ -82,6 +83,7 @@ export default function Exams() {
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [templates, setTemplates] = useState<{id: string, name: string}[]>([]);
+  const { hasPermission } = usePermission();
   
   // Modals
   const [showModal, setShowModal] = useState(false);
@@ -98,23 +100,34 @@ export default function Exams() {
     setLoading(true);
     try {
       const [resExams, resTpls] = await Promise.all([
-        api.get('/exams', { params: { search } }),
+        api.get('/exams', { params: { search, limit: 50 } }),
         api.get('/certificate-templates')
       ]);
       setExams(resExams.data.data);
       setTemplates(resTpls.data);
-    } catch (err) { console.error(err); toast.error("Erro ao carregar dados"); }
+    } catch (err) { 
+      console.error(err);
+      toast.error("Erro ao carregar dados");
+    }
     setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, [search]); // Depend on search here if we want but actually the original had loadExams in enter but search was manually triggered.
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  // Restore the original behavior for search
-  const triggerSearch = () => { loadData(); };
+  const triggerSearch = () => {
+    loadData();
+  };
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ title: '', description: '', questionCount: 10, durationMinutes: 60, passingScore: 70, maxAttempts: 0, cooldownDays: 0, questionOrder: 'FIXED', certificateTemplateId: null });
+    setForm({
+      title: '', description: '',
+      questionCount: 10, durationMinutes: 60, passingScore: 70,
+      maxAttempts: 0, cooldownDays: 0, questionOrder: 'FIXED',
+      certificateTemplateId: null,
+    });
     setShowModal(true);
   };
 
@@ -163,10 +176,10 @@ export default function Exams() {
     }
   };
 
-  const handleDelete = async (exam: Exam) => {
-    if (!confirm(`Excluir a prova "${exam.title}"?`)) return;
+  const handleDelete = async (examId: string) => {
+    if (!confirm(`Excluir esta prova?`)) return;
     try {
-      await api.delete(`/exams/${exam.id}`);
+      await api.delete(`/exams/${examId}`);
       toast.success("Prova excluída");
       triggerSearch();
     } catch (err: any) {
@@ -201,11 +214,13 @@ export default function Exams() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Provas</h1>
-          <p className="text-muted-foreground">{exams.length} prova(s) cadastradas no sistema</p>
+          <p className="text-muted-foreground mt-1">{exams.length} prova(s) cadastradas no sistema</p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="size-4" /> Nova Prova
-        </Button>
+        {hasPermission('canCreate') && (
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="size-4" /> Nova Prova
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center gap-4">
@@ -298,32 +313,38 @@ export default function Exams() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{getStatusBadge(e.status)}</TableCell>
+                    <TableCell>
+                      <button onClick={() => toggleStatus(e)} className="hover:opacity-80 transition-opacity">
+                        {getStatusBadge(e.status)}
+                      </button>
+                    </TableCell>
                     <TableCell className="text-right px-6">
-                       <DropdownMenu>
+                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="group-hover:bg-background">
+                          <Button variant="ghost" size="icon">
                             <MoreVertical className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-52">
-                          <DropdownMenuItem onClick={() => navigate(`/admin/exams/${e.id}/questions`)} className="gap-2">
-                            <BookOpen className="size-4" /> Gerenciar Questões
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem onClick={() => navigate(`/admin/exams/${e.id}/questions`)}>
+                            <BookOpen className="mr-2 h-4 w-4" /> Gerenciar Questões
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openEdit(e)} className="gap-2">
-                            <Edit2 className="size-4" /> Editar Prova
+                          <DropdownMenuItem onClick={() => navigate(`/admin/exams/${e.id}/releases`)}>
+                            <ArrowUpRight className="mr-2 h-4 w-4" /> Liberar para Turma
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => toggleStatus(e)} className="gap-2">
-                            {e.status === 'PUBLISHED' ? (
-                              <><Clock className="size-4" /> Mover para Rascunho</>
-                            ) : (
-                              <><CheckCircle2 className="size-4 text-green-500" /> Publicar Prova</>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleDelete(e)} className="gap-2 text-destructive focus:text-destructive">
-                            <Trash2 className="size-4" /> Excluir Prova
-                          </DropdownMenuItem>
+                          {hasPermission('canEdit') && (
+                            <DropdownMenuItem onClick={() => openEdit(e)}>
+                              <Edit2 className="mr-2 h-4 w-4" /> Configurações
+                            </DropdownMenuItem>
+                          )}
+                          {hasPermission('canDelete') && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleDelete(e.id)} className="text-destructive focus:text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" /> Excluir Prova
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -336,81 +357,81 @@ export default function Exams() {
       </Card>
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar Prova' : 'Nova Prova'}</DialogTitle>
+            <DialogTitle>{editing ? 'Configurações da Prova' : 'Nova Prova'}</DialogTitle>
             <DialogDescription>
-              {editing ? `Editando as configurações da prova "${editing.title}"` : 'Crie uma nova prova de certificação definindo as regras básicas.'}
+              Defina os critérios e configurações para esta avaliação.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Título *</Label>
-              <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder="Ex: Certificação Master Nível 1" />
-            </div>
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} placeholder="Breve resumo da prova..." />
-            </div>
-            
-            <div className="grid grid-cols-3 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-2">
+                <Label>Título da Prova</Label>
+                <Input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Ex: Certificação Master Elite" required />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Descrição (Opcional)</Label>
+                <Textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Breve resumo sobre a prova..." />
+              </div>
+              
               <div className="space-y-2">
-                <Label>Nº de Questões</Label>
-                <Input type="number" value={form.questionCount} onChange={e => setForm({ ...form, questionCount: +e.target.value })} min={1} required />
+                 <Label>Meta de Questões</Label>
+                 <Input type="number" value={form.questionCount} onChange={e => setForm({...form, questionCount: Number(e.target.value)})} min={1} />
               </div>
               <div className="space-y-2">
-                <Label>Duração (min)</Label>
-                <Input type="number" value={form.durationMinutes} onChange={e => setForm({ ...form, durationMinutes: +e.target.value })} min={1} required />
+                 <Label>Duração (minutos)</Label>
+                 <Input type="number" value={form.durationMinutes} onChange={e => setForm({...form, durationMinutes: Number(e.target.value)})} min={1} />
               </div>
               <div className="space-y-2">
-                <Label>% Aprovação</Label>
-                <Input type="number" value={form.passingScore} onChange={e => setForm({ ...form, passingScore: +e.target.value })} min={0} max={100} required />
+                 <Label>Nota de Corte (%)</Label>
+                 <Input type="number" value={form.passingScore} onChange={e => setForm({...form, passingScore: Number(e.target.value)})} min={1} max={100} />
+              </div>
+              <div className="space-y-2">
+                 <Label>Ordem das Questões</Label>
+                 <Select value={form.questionOrder} onValueChange={(v: any) => setForm({...form, questionOrder: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FIXED">Fixa</SelectItem>
+                      <SelectItem value="RANDOM">Aleatória</SelectItem>
+                    </SelectContent>
+                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                 <Label>Limite de Tentativas</Label>
+                 <Input type="number" value={form.maxAttempts} onChange={e => setForm({...form, maxAttempts: Number(e.target.value)})} min={0} />
+                 <p className="text-[10px] text-muted-foreground">0 = Ilimitado</p>
+              </div>
+              <div className="space-y-2">
+                 <Label>Dias de Cooldown</Label>
+                 <Input type="number" value={form.cooldownDays} onChange={e => setForm({...form, cooldownDays: Number(e.target.value)})} min={0} />
+                 <p className="text-[10px] text-muted-foreground">Bloqueio após erro</p>
+              </div>
+
+              <div className="col-span-2 space-y-2 pt-2">
+                 <Label className="flex items-center gap-2">
+                   Template de Certificado
+                   <Badge variant="outline" className="font-normal text-[10px]">VIP</Badge>
+                 </Label>
+                 <Select value={form.certificateTemplateId || 'none'} onValueChange={v => setForm({...form, certificateTemplateId: v === 'none' ? null : v})}>
+                    <SelectTrigger className="bg-primary/5 border-primary/20">
+                      <SelectValue placeholder="Selecione o certificado..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum (não gera certificado)</SelectItem>
+                      {templates.map(t => (
+                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                 </Select>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Máx. Tentativas</Label>
-                <Input type="number" value={form.maxAttempts} onChange={e => setForm({ ...form, maxAttempts: +e.target.value })} min={0} required />
-                <p className="text-[10px] text-muted-foreground leading-tight">0 = Ilimitado</p>
-              </div>
-              <div className="space-y-2">
-                <Label>Cooldown (Dias)</Label>
-                <Input type="number" value={form.cooldownDays} onChange={e => setForm({ ...form, cooldownDays: +e.target.value })} min={0} required />
-                <p className="text-[10px] text-muted-foreground leading-tight">Bloqueio após falha</p>
-              </div>
-              <div className="space-y-2">
-                <Label>Ordem</Label>
-                <Select value={form.questionOrder} onValueChange={(v: any) => setForm({ ...form, questionOrder: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="FIXED">Fixa</SelectItem>
-                    <SelectItem value="RANDOM">Aleatória</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Template de Certificado</Label>
-              <Select value={form.certificateTemplateId || "none"} onValueChange={(v) => setForm({ ...form, certificateTemplateId: v === "none" ? null : v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um template..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum Template (Não emite certificado)</SelectItem>
-                  {templates.map(t => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter className="pt-4">
+            <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setShowModal(false)} disabled={isSaving}>Cancelar</Button>
               <Button type="submit" disabled={isSaving}>
-                {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editing ? 'Salvar Alterações' : 'Criar Prova'}
               </Button>
             </DialogFooter>

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import path from 'path';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 import { getEmailProvider, getAuthorizedSender, dispatchTemplateToMandrill } from '../services/mail';
 import { MANDRILL_TEMPLATES, TemplateKey } from '../services/mail-templates';
 import { EmailEventKey } from '../constants/emailEvents';
@@ -62,7 +63,7 @@ router.get('/exams-with-releases', authMiddleware, requireRole('ADMIN'), async (
 });
 
 // POST /api/dispatches/recipients/resolve — Resolver lista de destinatários por filtro
-router.post('/recipients/resolve', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/recipients/resolve', authMiddleware, requireRole('ADMIN'), checkPermission('canSendEmails'), async (req: Request, res: Response) => {
   try {
     const { type, classId, examId, releaseId } = req.body;
 
@@ -127,7 +128,7 @@ router.post('/recipients/resolve', authMiddleware, requireRole('ADMIN'), async (
 });
 
 // POST /api/dispatches — Criar novo disparo em lote
-router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canSendEmails'), async (req: Request, res: Response) => {
   try {
     const { templateSlug, recipientGroup, recipientIds: initialIds, classId, variables = {} } = req.body;
     let recipientIds = initialIds || [];

@@ -38,14 +38,12 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  History,
-  Unlock,
-  FileJson,
-  Send,
-  ChevronUp,
-  ChevronDown,
   ArrowLeft,
-  Mail
+  Mail,
+  ArrowUpRight,
+  FileJson,
+  Unlock,
+  Send
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,14 +54,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { Label } from '@/components/ui/label';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { EMAIL_TEMPLATES as TEMPLATES } from '@/constants/email-templates';
+
+import { usePermission } from '../../hooks/usePermission';
 
 interface ClassItem {
   id: string;
@@ -96,37 +96,37 @@ interface ClassMetrics {
 }
 
 export default function Classes() {
-  const navigate = useNavigate();
   const [view, setView] = useState<'list' | 'manage'>('list');
+  const { hasPermission } = usePermission();
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<ClassItem | null>(null);
   const [form, setForm] = useState({ name: '', description: '' });
-  const [classSearch, setClassSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [classSearch, setClassSearch] = useState('');
 
-  // Selected Class Management State
+  // Manage Class View State
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [classData, setClassData] = useState<{name: string, description: string} | null>(null);
   const [students, setStudents] = useState<StudentPerformance[]>([]);
   const [metrics, setMetrics] = useState<ClassMetrics | null>(null);
   const [loadingManage, setLoadingManage] = useState(false);
-  const [studentSearch, setStudentSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'grade', direction: 'desc' });
   const [releases, setReleases] = useState<any[]>([]);
   const [availableExams, setAvailableExams] = useState<any[]>([]);
+  
+  // Link Exam State
   const [examToLink, setExamToLink] = useState('');
   const [isLinking, setIsLinking] = useState(false);
 
-  // Dispatch Modal State
   const [isDispatchOpen, setIsDispatchOpen] = useState(false);
-  const [dispatchStep, setDispatchStep] = useState(1);
+  const [selectedStudent, setSelectedStudent] = useState<StudentPerformance | null>(null);
   const [dispatchFilter, setDispatchFilter] = useState<'ALL' | 'APPROVED' | 'REPROVED' | 'LIBERADO' | 'PENDING' | 'COOLDOWN'>('ALL');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [activeBindings, setActiveBindings] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
+
+  const setDispatchStep = (_step: number) => {}; // No longer needed but keeping for minimal JSX change if still referenced
 
   const fetchClasses = async (search = classSearch) => {
     setLoading(true);
@@ -151,7 +151,8 @@ export default function Classes() {
       setReleases(rel);
       const boundIds = rel.map((r: any) => r.examId);
       setAvailableExams(exs.data.filter((e: any) => !boundIds.includes(e.id)));
-    } catch (e) {
+    } catch (err: any) {
+      console.error(err);
       toast.error("Erro ao carregar detalhes da turma");
     } finally {
       setLoadingManage(false);
@@ -174,7 +175,7 @@ export default function Classes() {
   };
 
   const handleUnlinkExam = async (examId: string, releaseId: string) => {
-    if (!confirm("Remover o vínculo desta prova com a turma? Alunos com cooldown ativo e tentativas finalizadas não serão restritos, mas não terão liberação automática nova.")) return;
+    if (!confirm("Remover o vínculo desta prova com a turma?")) return;
     try {
       await api.delete(`/exams/${examId}/releases/${releaseId}`);
       toast.success("Vínculo removido");
@@ -249,119 +250,68 @@ export default function Classes() {
       await api.put(`/exams/cooldowns/${cId}/clear`);
       toast.success("Cooldown liberado com sucesso!");
       if (selectedClassId) fetchClassDetails(selectedClassId);
-    } catch (err) {
+    } catch (err: any) {
       toast.error("Erro ao liberar cooldown");
     }
   };
 
-  const handleExportCSV = () => {
-    if (!selectedClassId) return;
-    const url = `${api.defaults.baseURL}/classes/${selectedClassId}/export`;
-    window.open(url, '_blank');
-  };
-
-  const handleOpenDispatch = () => {
-    setDispatchStep(1);
-    setDispatchFilter('ALL');
-    setSelectedTemplate('');
-    setIsDispatchOpen(true);
-    fetchBindings();
-  };
-
-  const handleStartDispatch = async () => {
+  const handleDispatch = async () => {
     if (!selectedTemplate) return toast.error("Selecione um template");
     setIsSending(true);
     try {
-      let recipientIds: string[] = [];
-      if (dispatchFilter === 'ALL') {
-        recipientIds = students.map(s => s.id);
-      } else {
-        recipientIds = students
-          .filter(s => s.status === dispatchFilter)
-          .map(s => s.id);
-      }
-
-      if (recipientIds.length === 0) {
-        toast.error("Nenhum aluno encontrado para este filtro");
-        setIsSending(false);
-        return;
-      }
-
-      await api.post('/dispatches', {
-        templateSlug: selectedTemplate,
-        recipientGroup: 'manual',
-        recipientIds
-      });
-
-      toast.success(`${recipientIds.length} e-mails disparados com sucesso!`);
+      const payload = {
+        templateId: selectedTemplate,
+        classId: selectedClassId,
+        studentId: selectedStudent?.id || null,
+        filter: selectedStudent ? 'SINGLE' : dispatchFilter
+      };
+      await api.post('/email-templates/dispatch', payload);
+      toast.success("Disparo iniciado com sucesso!");
       setIsDispatchOpen(false);
-    } catch (err) {
-      toast.error("Erro ao realizar disparo");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Erro ao realizar disparo");
     } finally {
       setIsSending(false);
     }
   };
 
-  const sortedStudents = [...students]
-    .filter(s => (statusFilter === 'ALL' || s.status === statusFilter))
-    .filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase()))
-    .sort((a, b) => {
-      if (!sortConfig) return 0;
-      const { key, direction } = sortConfig;
-      const aVal = (a as any)[key] || 0;
-      const bVal = (b as any)[key] || 0;
-      if (aVal < bVal) return direction === 'asc' ? -1 : 1;
-      if (aVal > bVal) return direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'APPROVED': return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Aprovado</Badge>;
-      case 'REPROVED': return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Reprovado</Badge>;
-      case 'COOLDOWN': return <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20">Em Cooldown</Badge>;
-      case 'LIBERADO': return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">Liberado</Badge>;
-      default: return <Badge variant="outline">Pendente</Badge>;
-    }
-  };
-
   return (
-    <div className="p-6 space-y-6">
-      <TooltipProvider>
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
       {view === 'list' ? (
         <>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Turmas</h1>
-              <p className="text-muted-foreground">Gerencie turmas e vínculos com alunos</p>
+              <p className="text-muted-foreground mt-1">Gerencie grupos de alunos e liberação de provas.</p>
             </div>
-            <Button onClick={openNew} className="gap-2">
-              <Plus className="size-4" /> Nova Turma
-            </Button>
+            {hasPermission('canCreate') && (
+              <Button onClick={openNew} className="gap-2 px-6">
+                <Plus className="size-4" /> Nova Turma
+              </Button>
+            )}
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <div className="flex flex-col md:flex-row md:items-center gap-4 mb-2">
+            <div className="relative flex-1 max-w-sm group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <Input
-                placeholder="Buscar por nome da turma..."
-                className="pl-9 h-11 bg-muted/50"
-		autoComplete="off"
+                placeholder="Buscar turmas..."
+                className="pl-10 h-11 bg-background shadow-sm border-2 focus-visible:ring-primary/20"
                 value={classSearch}
                 onChange={(e) => setClassSearch(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="bg-card rounded-xl border overflow-hidden">
+          <div className="bg-card rounded-xl border overflow-hidden shadow-sm">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="px-6">Nome</TableHead>
+                  <TableHead className="px-6 py-4">Nome</TableHead>
                   <TableHead className="px-6">Descrição</TableHead>
                   <TableHead className="px-6">Alunos</TableHead>
                   <TableHead className="px-6">Criada em</TableHead>
-                  <TableHead className="w-20 px-6">Ações</TableHead>
+                  <TableHead className="w-20 px-6 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -379,45 +329,53 @@ export default function Classes() {
                   </TableRow>
                 ) : (
                   classes.map((c) => (
-                    <TableRow key={c.id}>
+                    <TableRow key={c.id} className="hover:bg-muted/30 transition-colors group">
                       <TableCell className="px-6">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button 
-                              onClick={() => handleManageClass(c.id)}
-                              className="font-semibold text-blue-600 hover:underline text-left cursor-pointer transition-all"
-                            >
-                              {c.name}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>Clique para gerenciar</TooltipContent>
-                        </Tooltip>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button 
+                                onClick={() => handleManageClass(c.id)}
+                                className="font-bold text-blue-600 hover:text-blue-700 hover:underline text-left cursor-pointer transition-all"
+                              >
+                                {c.name}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Clique para gerenciar</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableCell>
                       <TableCell className="text-muted-foreground max-w-xs truncate px-6">{c.description || '-'}</TableCell>
                       <TableCell className="px-6">
-                        <Badge variant="secondary" className="gap-1">
+                        <Badge variant="secondary" className="gap-1 font-bold">
                           <Users className="size-3" /> {c._count.students}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground px-6">{new Date(c.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell className="px-6">
+                      <TableCell className="px-6 text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="hover:bg-muted-foreground/10 h-8 w-8">
                               <MoreHorizontal className="size-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleManageClass(c.id)} className="gap-2">
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => handleManageClass(c.id)} className="gap-2 font-medium">
                               <Target className="size-4" /> Gerenciar
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openEdit(c)} className="gap-2">
-                              <Edit2 className="size-4" /> Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleDelete(c.id)} className="gap-2 text-red-600 focus:text-red-600">
-                              <Trash2 className="size-4" /> Excluir
-                            </DropdownMenuItem>
+                            {hasPermission('canEdit') && (
+                              <DropdownMenuItem onClick={() => openEdit(c)} className="gap-2 font-medium">
+                                <Edit2 className="size-4" /> Editar
+                              </DropdownMenuItem>
+                            )}
+                            {hasPermission('canDelete') && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleDelete(c.id)} className="gap-2 font-medium text-destructive focus:text-destructive">
+                                  <Trash2 className="size-4" /> Excluir
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -430,319 +388,347 @@ export default function Classes() {
         </>
       ) : (
         <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={handleBackToList} className="gap-2 -ml-2">
-              <ArrowLeft className="size-4" /> Voltar para Turmas
-            </Button>
-            <div className="h-4 w-px bg-border" />
-            <h1 className="text-2xl font-bold">{classData?.name}</h1>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+             <div className="flex items-center gap-4">
+                <Button variant="ghost" size="sm" onClick={handleBackToList} className="gap-2 -ml-2 hover:bg-muted font-bold text-muted-foreground">
+                  <ArrowLeft className="size-4" /> Voltar
+                </Button>
+                <div className="h-6 w-px bg-border" />
+                <h1 className="text-2xl font-bold tracking-tight">{classData?.name}</h1>
+             </div>
+             {hasPermission('canSendEmails') && (
+               <Button onClick={() => { setSelectedStudent(null); setDispatchStep(1); setIsDispatchOpen(true); fetchBindings(); }} className="gap-2 bg-blue-600 hover:bg-blue-700">
+                  <Mail className="size-4" /> Disparo em Massa
+               </Button>
+             )}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-            <Card className="bg-muted/30">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <Card className="bg-blue-50/50 border-blue-100 shadow-sm">
               <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg"><Users className="size-5" /></div>
-                <div><p className="text-xs text-muted-foreground uppercase font-bold">Total</p><p className="text-xl font-bold">{metrics?.total || 0}</p></div>
+                <div className="p-2 bg-blue-500/10 text-blue-600 rounded-lg shadow-inner"><Users className="size-5" /></div>
+                <div><p className="text-[10px] text-blue-600 uppercase font-black tracking-wider">Total</p><p className="text-2xl font-black text-blue-700">{metrics?.total || 0}</p></div>
               </CardContent>
             </Card>
-            <Card className="bg-muted/30">
+            <Card className="bg-green-50/50 border-green-100 shadow-sm">
               <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-green-500/10 text-green-500 rounded-lg"><CheckCircle2 className="size-5" /></div>
-                <div><p className="text-xs text-muted-foreground uppercase font-bold">Aprovados</p><p className="text-xl font-bold">{metrics?.approved || 0}</p></div>
+                <div className="p-2 bg-green-500/10 text-green-600 rounded-lg shadow-inner"><CheckCircle2 className="size-5" /></div>
+                <div><p className="text-[10px] text-green-600 uppercase font-black tracking-wider">Aprov.</p><p className="text-2xl font-black text-green-700">{metrics?.approved || 0}</p></div>
               </CardContent>
             </Card>
-            <Card className="bg-muted/30">
+            <Card className="bg-red-50/50 border-red-100 shadow-sm">
               <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-red-500/10 text-red-500 rounded-lg"><AlertCircle className="size-5" /></div>
-                <div><p className="text-xs text-muted-foreground uppercase font-bold">Reprovados</p><p className="text-xl font-bold">{metrics?.reproved || 0}</p></div>
+                <div className="p-2 bg-red-500/10 text-red-600 rounded-lg shadow-inner"><AlertCircle className="size-5" /></div>
+                <div><p className="text-[10px] text-red-600 uppercase font-black tracking-wider">Reprov.</p><p className="text-2xl font-black text-red-700">{metrics?.reproved || 0}</p></div>
               </CardContent>
             </Card>
-            <Card className="bg-muted/30">
+            <Card className="bg-amber-50/50 border-amber-100 shadow-sm">
               <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-blue-500/10 text-blue-600 rounded-lg"><Unlock className="size-5" /></div>
-                <div><p className="text-xs text-muted-foreground uppercase font-bold">Liberados</p><p className="text-xl font-bold">{metrics?.released || 0}</p></div>
+                <div className="p-2 bg-amber-500/10 text-amber-600 rounded-lg shadow-inner"><Clock className="size-5" /></div>
+                <div><p className="text-[10px] text-amber-600 uppercase font-black tracking-wider">Cooldown</p><p className="text-2xl font-black text-amber-700">{metrics?.cooldown || 0}</p></div>
               </CardContent>
             </Card>
-            <Card className="bg-muted/30">
+            <Card className="bg-purple-50/50 border-purple-100 shadow-sm">
               <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-slate-500/10 text-slate-500 rounded-lg"><Target className="size-5" /></div>
-                <div><p className="text-xs text-muted-foreground uppercase font-bold">Pendentes</p><p className="text-xl font-bold">{metrics?.pending || 0}</p></div>
-              </CardContent>
-            </Card>
-            <Card className="bg-muted/30">
-              <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-orange-500/10 text-orange-500 rounded-lg"><Clock className="size-5" /></div>
-                <div><p className="text-xs text-muted-foreground uppercase font-bold">Cooldown</p><p className="text-xl font-bold">{metrics?.cooldown || 0}</p></div>
+                <div className="p-2 bg-purple-500/10 text-purple-600 rounded-lg shadow-inner"><Target className="size-5" /></div>
+                <div><p className="text-[10px] text-purple-600 uppercase font-black tracking-wider">Liberado</p><p className="text-2xl font-black text-purple-700">{metrics?.released || 0}</p></div>
               </CardContent>
             </Card>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-             <Card className="bg-card shadow-sm border">
-               <CardHeader className="py-4 border-b">
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-base font-bold flex items-center gap-2"><Target className="size-4 text-primary"/> Provas Vinculadas</CardTitle>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+            <Card className="md:col-span-1 h-full shadow-sm border-none bg-muted/20">
+              <CardHeader className="p-4 border-b">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <ArrowUpRight className="size-4 text-blue-500" /> Provas Vinculadas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                {hasPermission('canEdit') && (
+                  <div className="p-3 bg-background rounded-xl border-2 border-dashed space-y-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground opacity-60">Liberar Prova para Turma</p>
                     <div className="flex gap-2">
-                       <Select value={examToLink} onValueChange={setExamToLink}>
-                         <SelectTrigger className="w-[180px] h-8 bg-muted/50"><SelectValue placeholder="Selecione a prova"/></SelectTrigger>
-                         <SelectContent>{availableExams.length ? availableExams.map(e => <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>) : <SelectItem disabled value="_">Nenhuma disp.</SelectItem>}</SelectContent>
-                       </Select>
-                       <Button size="sm" onClick={handleLinkExam} disabled={!examToLink || examToLink === '_' || isLinking}>
-                         {isLinking ? <Loader2 className="size-3 animate-spin"/> : 'Vincular'}
-                       </Button>
+                      <Select value={examToLink} onValueChange={setExamToLink}>
+                        <SelectTrigger className="bg-muted/30 h-10 border-none">
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableExams.map(e => (
+                            <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button size="icon" onClick={handleLinkExam} disabled={isLinking} className="shrink-0 bg-primary/20 text-primary hover:bg-primary/30 border-none shadow-none">
+                        {isLinking ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                      </Button>
                     </div>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                   {releases.length === 0 ? (
+                      <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+                        <FileJson className="size-8 opacity-20" />
+                        <p className="text-xs italic">Nenhuma prova vinculada.</p>
+                      </div>
+                   ) : (
+                     <div className="grid gap-2">
+                        {releases.map((r: any) => (
+                          <div key={r.id} className="flex items-center justify-between p-3 bg-background border rounded-xl hover:shadow-md transition-all group overflow-hidden relative">
+                             <div className="flex flex-col min-w-0 mr-8">
+                               <span className="text-sm font-bold truncate block">{r.exam.title}</span>
+                               <span className="text-[10px] text-muted-foreground">{new Date(r.createdAt).toLocaleDateString()}</span>
+                             </div>
+                             {hasPermission('canEdit') && (
+                               <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="absolute right-1 top-1/2 -translate-y-1/2 size-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                                onClick={() => handleUnlinkExam(r.examId, r.id)}
+                               >
+                                <Trash2 className="size-3.5" />
+                               </Button>
+                             )}
+                          </div>
+                        ))}
+                     </div>
+                   )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-3 shadow-md border-none overflow-hidden">
+               <CardHeader className="p-4 border-b flex flex-row items-center justify-between pb-4">
+                  <div className="space-y-1">
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <Users className="size-4 text-primary" /> Desempenho dos Alunos
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Status atualizado de progresso nas provas vinculadas.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <Badge variant="outline" className="h-6 font-bold bg-muted/50">{students.length} Total</Badge>
                   </div>
                </CardHeader>
                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                       <TableRow>
-                          <TableHead className="px-4">Prova</TableHead>
-                          <TableHead className="w-20 px-4">Questões</TableHead>
-                          <TableHead className="w-16 px-4 text-right">Ação</TableHead>
-                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {releases.length === 0 ? (
-                           <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6 text-sm">Nenhuma prova liberada para esta turma no momento.</TableCell></TableRow>
-                        ) : releases.map(r => (
-                           <TableRow key={r.id}>
-                              <TableCell className="px-4 font-semibold text-sm">{r.exam.title}</TableCell>
-                              <TableCell className="px-4 text-muted-foreground text-sm">{r.exam.questionCount}q</TableCell>
-                              <TableCell className="px-4 text-right">
-                                 <Button variant="ghost" size="icon" className="text-red-600 size-8 hover:bg-red-500/10" onClick={() => handleUnlinkExam(r.examId, r.id)}><Trash2 className="size-4"/></Button>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-muted/40">
+                        <TableRow className="border-none">
+                          <TableHead className="px-6 py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80">Aluno</TableHead>
+                          <TableHead className="py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80">Status</TableHead>
+                          <TableHead className="py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80 text-center">Nota (%)</TableHead>
+                          <TableHead className="py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80 text-center">Tentativas</TableHead>
+                          <TableHead className="py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80">Última Atividade</TableHead>
+                          <TableHead className="px-6 py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80 text-right">Manutenção</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {loadingManage ? (
+                           <TableRow><TableCell colSpan={6} className="h-64 text-center"><Loader2 className="size-8 animate-spin mx-auto opacity-20" /></TableCell></TableRow>
+                        ) : students.length === 0 ? (
+                           <TableRow><TableCell colSpan={6} className="h-64 text-center text-muted-foreground">Turma vazia ou sem alunos matriculados.</TableCell></TableRow>
+                        ) : (
+                          students.map(s => (
+                            <TableRow key={s.id} className="hover:bg-muted/20 transition-colors border-b last:border-none group">
+                              <TableCell className="px-6 py-4">
+                                <Link to={`/admin/students/${s.id}`} className="font-bold text-sm text-primary hover:underline">{s.name}</Link>
+                                <p className="text-[11px] text-muted-foreground">{s.email}</p>
                               </TableCell>
-                           </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  {s.status === 'APROVADO' && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Aprovado</Badge>}
+                                  {s.status === 'REPROVADO' && <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200">Reprovado</Badge>}
+                                  {s.status === 'PENDENTE' && <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100 border-gray-200">Sem Vínculo</Badge>}
+                                  {s.status === 'LIBERADO' && <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">Pendente</Badge>}
+                                  {s.status === 'COOLDOWN' && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200 cursor-help gap-1">
+                                            <Clock className="size-3" /> Bloqueado
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Liberado em: {s.cooldownUntil && new Date(s.cooldownUntil).toLocaleString()}</TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className="font-mono font-black text-sm">{s.grade === null ? '-' : `${s.grade}%`}</span>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className="text-sm font-medium">{s.attempts}</span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                   <span className="text-xs text-muted-foreground">{s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : 'Nunca'}</span>
+                                   {s.lastActivity && <span className="text-[10px] text-muted-foreground/60">{new Date(s.lastActivity).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>}
+                                </div>
+                              </TableCell>
+                              <TableCell className="px-6 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  {s.cooldownUntil && hasPermission('canDelete') && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="size-8 text-amber-600 hover:bg-amber-100 hover:text-amber-700 rounded-full"
+                                            onClick={() => s.cooldownId && handleClearCooldown(s.id, s.cooldownId)}
+                                          >
+                                            <Unlock className="size-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Liberar Aluno Agora</TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                  
+                                  {hasPermission('canSendEmails') && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="size-8 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded-full"
+                                            onClick={() => { setSelectedStudent(s); setDispatchStep(1); setIsDispatchOpen(true); fetchBindings(); }}
+                                          >
+                                            <Send className="size-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Enviar Comunicação Direta</TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                </CardContent>
-             </Card>
-          </div>
-
-          <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-            <div className="flex flex-wrap gap-2">
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                <Input placeholder="Filtrar aluno..." className="pl-9 bg-muted/50 h-9" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} />
-              </div>
-              <div className="flex bg-muted p-1 rounded-lg border">
-                {['ALL', 'APPROVED', 'REPROVED', 'LIBERADO', 'PENDING', 'COOLDOWN'].map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setStatusFilter(s)}
-                    className={`px-3 py-1 text-[10px] uppercase font-bold rounded-md transition-all ${statusFilter === s ? 'bg-background shadow-sm' : 'opacity-40 hover:opacity-100'}`}
-                  >
-                    {s === 'ALL' ? 'Todos' : s === 'APPROVED' ? 'Aprovado' : s === 'REPROVED' ? 'Reprovado' : s === 'LIBERADO' ? 'Liberado' : s === 'PENDING' ? 'Pendente' : 'Cooldown'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-2" onClick={handleExportCSV}><FileJson className="size-4" /> Exportar CSV</Button>
-              <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={handleOpenDispatch}><Send className="size-4" /> Disparar E-mail</Button>
-            </div>
-          </div>
-
-          <div className="bg-card rounded-xl border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="px-6">Nome</TableHead>
-                  <TableHead className="px-6">
-                    <button 
-                      className="flex items-center gap-1 hover:text-foreground"
-                      onClick={() => setSortConfig({ key: 'grade', direction: sortConfig?.direction === 'desc' ? 'asc' : 'desc' })}
-                    >
-                      Nota {sortConfig?.key === 'grade' && (sortConfig.direction === 'desc' ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />)}
-                    </button>
-                  </TableHead>
-                  <TableHead className="px-6">Status</TableHead>
-                  <TableHead className="px-6">Tentativas</TableHead>
-                  <TableHead className="px-6">Cooldown</TableHead>
-                  <TableHead className="px-6">Última Atividade</TableHead>
-                  <TableHead className="w-20 px-6">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingManage ? (
-                  <TableRow><TableCell colSpan={7} className="h-64 text-center"><Loader2 className="size-8 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
-                ) : sortedStudents.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="h-64 text-center text-muted-foreground">Nenhum aluno encontrado.</TableCell></TableRow>
-                ) : (
-                  sortedStudents.map(s => (
-                    <TableRow key={s.id}>
-                      <TableCell className="px-6">
-                        <div className="flex flex-col">
-                          <Link 
-                            to={`/admin/students/${s.id}`}
-                            className="font-medium text-sm hover:underline hover:text-primary transition-colors"
-                          >
-                            {s.name}
-                          </Link>
-                          <span className="text-[10px] text-muted-foreground">{s.email}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs px-6">{s.grade !== null ? `${s.grade}%` : '-'}</TableCell>
-                      <TableCell className="px-6">{getStatusBadge(s.status)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground px-6">{s.attempts} {s.attempts === 1 ? 'tentativa' : 'tentativas'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground px-6">
-                        {s.cooldownUntil ? new Date(s.cooldownUntil).toLocaleDateString() : '-'}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground px-6">
-                        {s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '-'}
-                      </TableCell>
-                      <TableCell className="px-6">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/admin/students/${s.id}`)} className="gap-2">
-                              <Users className="size-4" /> Ver Aluno
-                            </DropdownMenuItem>
-                            {s.status === 'COOLDOWN' && s.cooldownId && (
-                              <DropdownMenuItem onClick={() => handleClearCooldown(s.id, s.cooldownId!)} className="gap-2 text-green-600 focus:text-green-600">
-                                <History className="size-4" /> Liberar Cooldown
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+            </Card>
           </div>
         </div>
       )}
-      </TooltipProvider>
 
-      <Dialog open={isDispatchOpen} onOpenChange={setIsDispatchOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Disparar E-mail para Turma</DialogTitle>
-            <DialogDescription>
-              {dispatchStep === 1 && "Passo 1: Selecione o grupo de destinatários."}
-              {dispatchStep === 2 && "Passo 2: Escolha o template que deseja enviar."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4">
-            {dispatchStep === 1 && (
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { id: 'ALL', label: 'Todos', count: metrics?.total || 0, icon: <Users className="size-4" />, color: 'blue' },
-                  { id: 'APPROVED', label: 'Aprovados', count: metrics?.approved || 0, icon: <CheckCircle2 className="size-4" />, color: 'green' },
-                  { id: 'REPROVED', label: 'Reprovados', count: metrics?.reproved || 0, icon: <AlertCircle className="size-4" />, color: 'red' },
-                  { id: 'LIBERADO', label: 'Liberados', count: metrics?.released || 0, icon: <Unlock className="size-4" />, color: 'blue' },
-                  { id: 'PENDING', label: 'Pendentes', count: metrics?.pending || 0, icon: <Target className="size-4" />, color: 'slate' },
-                  { id: 'COOLDOWN', label: 'Em Cooldown', count: metrics?.cooldown || 0, icon: <Clock className="size-4" />, color: 'orange' },
-                ].map(group => (
-                  <button
-                    key={group.id}
-                    onClick={() => setDispatchFilter(group.id as any)}
-                    className={`p-4 rounded-xl border-2 transition-all text-left flex items-start gap-4 ${
-                      dispatchFilter === group.id ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted/50 border-transparent bg-muted/30'
-                    }`}
-                  >
-                    <div className={`p-2 rounded-lg bg-${group.color}-500/10 text-${group.color}-500`}>
-                      {group.icon}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-sm leading-tight">{group.label}</p>
-                      <p className="text-2xl font-black mt-1">{group.count}</p>
-                      <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">Alunos</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {dispatchStep === 2 && (
-              <div className="grid grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2">
-                {TEMPLATES.map(t => {
-                  const isSynced = Array.isArray(t.eventSlug)
-                    ? t.eventSlug.every(slug => activeBindings.some(b => b.eventKey === slug && b.isActive))
-                    : activeBindings.some(b => b.eventKey === t.eventSlug && b.isActive);
-                  
-                  return (
-                    <button
-                      key={t.slug}
-                      onClick={() => setSelectedTemplate(t.slug)}
-                      className={`p-4 rounded-xl border cursor-pointer transition-all text-left flex flex-col gap-2 ${
-                        selectedTemplate === t.slug ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted/50 border-transparent bg-muted/20'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className={`p-2 rounded-lg ${selectedTemplate === t.slug ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                          <Mail className="size-4" />
-                        </div>
-                        {isSynced ? (
-                          <Badge className="bg-green-500/10 text-green-500 border-green-500/20 text-[10px] h-5">Vinculado</Badge>
-                        ) : (
-                          <Badge variant="outline" className="border-amber-500/30 text-amber-500 text-[10px] h-5">Pendente</Badge>
-                        )}
-                      </div>
-                      <p className="font-semibold text-sm">{t.name}</p>
-                      <p className="text-[11px] text-muted-foreground line-clamp-2">{t.description}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="gap-2">
-            {dispatchStep === 2 && (
-              <Button variant="ghost" onClick={() => setDispatchStep(1)} disabled={isSending}>Anterior</Button>
-            )}
-            {dispatchStep === 1 ? (
-              <Button onClick={() => setDispatchStep(2)} disabled={metrics?.total === 0}>Próximo</Button>
-            ) : (
-              <Button onClick={handleStartDispatch} disabled={!selectedTemplate || isSending} className="gap-2 min-w-[120px]">
-                {isSending ? <Loader2 className="size-4 animate-spin" /> : <><Send className="size-4" /> Disparar</>}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      {/* CRUD Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar Turma' : 'Nova Turma'}</DialogTitle>
+            <DialogDescription>
+              As informações da turma são usadas para organizar alunos e emitir relatórios.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nome</label>
-              <Input
-                placeholder="Ex: Turma A - 2024"
-                value={form.name}
-                className="bg-muted/50"
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                required
+              <Label>Nome da Turma</Label>
+              <Input 
+                value={form.name} 
+                onChange={e => setForm({...form, name: e.target.value})} 
+                placeholder="Ex: Turma Elite Março 2024"
+                required 
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Descrição</label>
-              <Input
-                placeholder="Descrição opcional..."
-                value={form.description}
-                className="bg-muted/50"
-                onChange={e => setForm({ ...form, description: e.target.value })}
+              <Label>Descrição (Opcional)</Label>
+              <Input 
+                value={form.description} 
+                onChange={e => setForm({...form, description: e.target.value})} 
+                placeholder="Ex: Alunos de graduação em segurança"
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? <Loader2 className="size-4 animate-spin" /> : 'Salvar'}
+              <Button type="button" variant="ghost" onClick={() => setShowModal(false)} disabled={isSaving}>Cancelar</Button>
+              <Button type="submit" disabled={isSaving} className="bg-primary hover:bg-primary/90 text-white font-bold">
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editing ? 'Salvar Alterações' : 'Criar Turma'}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dispatch Modal */}
+      <Dialog open={isDispatchOpen} onOpenChange={setIsDispatchOpen}>
+        <DialogContent className="sm:max-w-lg overflow-hidden p-0">
+          <div className="p-6 bg-gradient-to-br from-primary/5 to-transparent border-b">
+             <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-primary/10 text-primary rounded-lg"><Mail className="size-5" /></div>
+                <h3 className="text-xl font-black tracking-tight">Disparar Comunicação</h3>
+             </div>
+             <p className="text-sm text-muted-foreground">
+               {selectedStudent 
+                ? `Enviar e-mail personalizado diretamente para ${selectedStudent.name}.` 
+                : `Disparar e-mail para todos os alunos da turma ${classData?.name} com base em filtros.`
+               }
+             </p>
+          </div>
+
+          <div className="p-6 pt-4 space-y-6">
+            {!selectedStudent && (
+              <div className="space-y-3">
+                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Filtrar Alunos Destinatários</Label>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                  {(['ALL', 'APPROVED', 'REPROVED', 'LIBERADO', 'PENDING', 'COOLDOWN'] as const).map(f => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setDispatchFilter(f)}
+                      className={`h-12 flex flex-col items-center justify-center border-2 rounded-xl transition-all ${dispatchFilter === f ? 'border-primary bg-primary/5 shadow-sm scale-105' : 'border-muted hover:border-muted-foreground/30'}`}
+                    >
+                      <span className="text-[10px] font-black uppercase tracking-tighter">{f === 'ALL' ? 'Todos' : f === 'LIBERADO' ? 'Pendente' : f === 'COOLDOWN' ? 'Bloqueado' : f}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Escolher Template de E-mail</Label>
+              <div className="space-y-2">
+                  <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                    <SelectTrigger className="h-12 border-2 bg-background data-[placeholder]:text-muted-foreground font-medium">
+                      <SelectValue placeholder="Selecione o conteúdo do e-mail..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeBindings.map(b => (
+                        <SelectItem key={b.internalTemplateId} value={b.internalTemplateId} className="py-3">
+                          <div className="flex flex-col">
+                            <span className="font-bold">{b.internalTemplate.name}</span>
+                            <span className="text-[10px] text-muted-foreground">Gatilho: {b.event}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] bg-amber-50 text-amber-700 p-2 rounded-lg border border-amber-100 flex items-center gap-2">
+                    <AlertCircle className="size-3 shrink-0" />
+                    <strong>Aviso:</strong> Certifique-se de que o template selecionado possui as variáveis (Merge Tags) suportadas.
+                  </p>
+              </div>
+            </div>
+            
+            <div className="pt-2">
+              <Button 
+                onClick={handleDispatch} 
+                disabled={isSending || !selectedTemplate} 
+                className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-black text-lg gap-3 shadow-lg shadow-primary/20 rounded-2xl group"
+              >
+                {isSending ? (
+                  <Loader2 className="size-6 animate-spin" />
+                ) : (
+                  <>Disparar Agora <Send className="size-5 group-hover:translate-x-1 transition-transform" /></>
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

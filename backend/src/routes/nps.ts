@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -52,7 +53,7 @@ router.get('/surveys', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // POST /api/nps/surveys
-router.post('/surveys', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/surveys', authMiddleware, requireRole('ADMIN'), checkPermission('canSendEmails'), async (req: Request, res: Response) => {
   try {
     const { title, classId, questions } = req.body;
     if (!title) return res.status(400).json({ error: 'Título é obrigatório' });
@@ -84,7 +85,7 @@ router.post('/surveys', authMiddleware, requireRole('ADMIN'), async (req: Reques
 });
 
 // PUT /api/nps/surveys/:id
-router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const surveyId = req.params.id as string;
 
@@ -132,7 +133,7 @@ router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: Req
 });
 
 // DELETE /api/nps/surveys/:id
-router.delete('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/surveys/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     await prisma.npsSurvey.delete({ where: { id: req.params.id as string } });
     return res.json({ message: 'Pesquisa excluída' });
@@ -146,7 +147,7 @@ router.delete('/surveys/:id', authMiddleware, requireRole('ADMIN'), async (req: 
 // ============================================================
 
 // POST /api/nps/surveys/:id/send — Send to all students in class
-router.post('/surveys/:id/send', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/surveys/:id/send', authMiddleware, requireRole('ADMIN'), checkPermission('canSendEmails'), async (req: Request, res: Response) => {
   try {
     const survey = await prisma.npsSurvey.findUnique({
       where: { id: req.params.id as string },
@@ -198,7 +199,7 @@ router.post('/surveys/:id/send', authMiddleware, requireRole('ADMIN'), async (re
 });
 
 // POST /api/nps/surveys/:id/send-individual — Send to one student
-router.post('/surveys/:id/send-individual', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/surveys/:id/send-individual', authMiddleware, requireRole('ADMIN'), checkPermission('canSendEmails'), async (req: Request, res: Response) => {
   try {
     const { studentId } = req.body;
     if (!studentId) return res.status(400).json({ error: 'ID do aluno é obrigatório' });

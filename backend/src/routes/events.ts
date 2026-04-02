@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 import { sendEventReferralEmail } from '../services/mail';
 
 const router = Router();
@@ -74,7 +75,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 
 // ── ADMIN: Criar evento ───────────────────────────────────────────────────────
 // POST /api/events
-router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { title, shortDescription, longDescription, date, location, isOnline, coverImageUrl, totalSpots, price, status } = req.body;
     if (!title || !shortDescription || !longDescription || !date || !location || !coverImageUrl) {
@@ -102,7 +103,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 
 // ── ADMIN: Editar evento ──────────────────────────────────────────────────────
 // PUT /api/events/:id
-router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { title, shortDescription, longDescription, date, location, isOnline, coverImageUrl, totalSpots, price, status } = req.body;
@@ -129,7 +130,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 
 // ── ADMIN: Remover evento ─────────────────────────────────────────────────────
 // DELETE /api/events/:id
-router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await prisma.event.delete({ where: { id: id as string } });
@@ -246,7 +247,7 @@ router.get('/:id/referrals', authMiddleware, requireRole('ADMIN'), async (req: R
 
 // ── ADMIN: Marcar indicação como convertida ───────────────────────────────────
 // PATCH /api/events/:id/referrals/:referralId/convert
-router.patch('/:id/referrals/:referralId/convert', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.patch('/:id/referrals/:referralId/convert', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { referralId } = req.params;
     const { converted } = req.body;

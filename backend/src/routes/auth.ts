@@ -7,6 +7,27 @@ import { authMiddleware, AuthPayload } from '../middleware/auth';
 import { getClientInfo } from '../middleware/audit';
 import { sendPasswordResetEmail } from '../services/mail';
 import crypto from 'crypto';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = 'assets/avatars';
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `avatar-${(req as any).user.userId}${ext}`);
+    }
+  }),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Somente imagens são permitidas'));
+  }
+});
 
 const router = Router();
 
@@ -32,7 +53,7 @@ router.post('/register', async (req: Request, res: Response) => {
         name,
         email,
         passwordHash,
-        role: userRole,
+        role: userRole as any,
         ...(userRole === 'STUDENT' && {
           student: {
             create: {
@@ -126,6 +147,7 @@ router.post('/login', async (req: Request, res: Response) => {
         email: user.email,
         role: user.role,
         studentId: user.student?.id || null,
+        avatarUrl: user.avatarUrl,
       },
       token,
     });
@@ -152,11 +174,73 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      avatarUrl: user.avatarUrl,
       studentId: user.student?.id || null,
       lastLoginAt: user.lastLoginAt,
     });
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao buscar perfil' });
+  }
+});
+
+// PUT /api/auth/profile/details — Atualiza Nome/Email
+router.put('/profile/details', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { name, email } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'Campos obrigatórios' });
+
+    const updated = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { name, email }
+    });
+
+    return res.json({ message: 'Dados atualizados!', user: { name: updated.name, email: updated.email } });
+  } catch (err: any) {
+    if (err.code === 'P2002') return res.status(400).json({ error: 'E-mail em uso.' });
+    return res.status(500).json({ error: 'Erro ao atualizar dados.' });
+  }
+});
+
+// PUT /api/auth/profile/password — Alterar Senha com verificação
+router.put('/profile/password', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Senhas obrigatórias' });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) return res.status(401).json({ error: 'Senha atual incorreta.' });
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, sessionToken: null } // Desloga para segurança
+    });
+
+    return res.json({ message: 'Senha alterada com sucesso! Por favor, faça login novamente.' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Erro ao trocar senha.' });
+  }
+});
+
+// POST /api/auth/profile/avatar — Upload de Avatar
+router.post('/profile/avatar', authMiddleware, upload.single('avatar'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+
+    const avatarUrl = `/assets/avatars/${req.file.filename}`;
+    await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { 
+        avatarUrl 
+      }
+    });
+
+    return res.json({ message: 'Foto de perfil atualizada!', avatarUrl });
+  } catch (err) {
+    return res.status(500).json({ error: 'Erro ao salvar avatar.' });
   }
 });
 
@@ -173,6 +257,8 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
     return res.json({
       name: user.name,
       email: user.email,
+      avatarUrl: user.avatarUrl,
+      role: user.role,
       lastName: user.student?.lastName || '',
       phone: user.student?.phone || '',
       cpf: user.student?.cpf || '',
@@ -221,10 +307,6 @@ router.put('/profile', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-// =========================================================
-// PASSWORD RECOVERY
-// =========================================================
-
 // POST /api/auth/forgot-password
 router.post('/forgot-password', async (req: Request, res: Response) => {
   try {
@@ -233,12 +315,10 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({ where: { email }, include: { student: true } });
     
-    // Sempre retorna mensagem de sucesso para evitar user enumeration
     if (!user) {
       return res.json({ message: 'Se o e-mail existir, você receberá um link de recuperação em breve.' });
     }
 
-    // Gera um token criptograficamente seguro e expiração (1h)
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenExpires = new Date(Date.now() + 3600000); // 1 hora
 
@@ -249,10 +329,8 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
 
     const resetLink = `${env.FRONTEND_URL || 'https://certify.elitetraining.com.br'}/reset-password?token=${resetToken}`;
     
-    // Envia o e-mail sem aguardar para evitar que um atacante meça o tempo de resposta
     sendPasswordResetEmail(user.name, user.email, resetLink, user.student?.lastName || '').catch(() => {});
 
-    // Registra evento para segurança
     const { ip, device } = getClientInfo(req);
     await prisma.auditEvent.create({
       data: { userId: user.id, action: 'PASSWORD_RESET_REQUESTED', entity: 'user', entityId: user.id, ip, device }
@@ -277,7 +355,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
     const user = await prisma.user.findFirst({
       where: {
         resetToken: token,
-        resetTokenExpires: { gt: new Date() } // Expiração válida
+        resetTokenExpires: { gt: new Date() }
       }
     });
 
@@ -293,7 +371,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
         passwordHash,
         resetToken: null,
         resetTokenExpires: null,
-        sessionToken: null // Desloga de todos os dispositivos
+        sessionToken: null
       }
     });
 

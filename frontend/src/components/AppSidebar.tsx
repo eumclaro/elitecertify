@@ -14,9 +14,11 @@ import {
   Send,
   CalendarDays,
   Medal,
+  ShieldCheck,
 } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
+import { usePermission } from "@/hooks/usePermission"
 import {
   Sidebar,
   SidebarContent,
@@ -49,6 +51,7 @@ const adminLinks = [
   { path: '/admin/emails', label: 'Templates de E-mail', icon: Mail },
   { path: '/admin/dispatches', label: 'Disparos', icon: Send },
   { path: '/admin/events', label: 'Marketing Hub', icon: CalendarDays },
+  { path: '/admin/team', label: 'Equipe', icon: ShieldCheck },
 ];
 
 const studentLinks = [
@@ -58,10 +61,11 @@ const studentLinks = [
 
 export function AppSidebar() {
   const { user, logout } = useAuth();
+  const { hasPermission } = usePermission();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'VIEWER';
 
   const navLinks = isAdmin ? adminLinks : studentLinks;
 
@@ -101,20 +105,30 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navLinks.map((link) => (
-                <SidebarMenuItem key={link.path}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(link.path)}
-                    tooltip={link.label}
-                  >
-                    <Link to={link.path}>
-                      <link.icon className="size-4" />
-                      <span>{link.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navLinks.map((link) => {
+                // Permission-based visibility
+                if (link.path === '/admin/team' && !hasPermission('canManageAdmins')) return null;
+                if (link.path === '/admin/audit' && !hasPermission('canManageAdmins')) return null;
+                if (link.path === '/admin/smtp' && !hasPermission('canManageSettings')) return null;
+                if (link.path === '/admin/emails' && !hasPermission('canManageSettings')) return null;
+                if (link.path === '/admin/certificate-templates' && !hasPermission('canManageSettings')) return null;
+                if (link.path === '/admin/events' && !hasPermission('canManageMarketing')) return null;
+
+                return (
+                  <SidebarMenuItem key={link.path}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive(link.path)}
+                      tooltip={link.label}
+                    >
+                      <Link to={link.path}>
+                        <link.icon className="size-4" />
+                        <span>{link.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

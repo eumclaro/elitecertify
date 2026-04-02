@@ -6,8 +6,9 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'STUDENT';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'VIEWER' | 'STUDENT';
   studentId?: string;
+  avatarUrl?: string;
 }
 
 interface AuthContextType {
@@ -17,6 +18,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isAdmin: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -25,6 +27,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const refreshUser = async () => {
+    try {
+      const res = await api.get('/auth/me');
+      setUser(res.data);
+      localStorage.setItem('elt-cert-user', JSON.stringify(res.data));
+    } catch (err) {
+      console.error('Refresh user error:', err);
+    }
+  };
 
   useEffect(() => {
     const savedToken = localStorage.getItem('elt-cert-token');
@@ -65,7 +77,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, isAdmin: user?.role === 'ADMIN' }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      token, 
+      loading, 
+      login, 
+      logout, 
+      isAdmin: user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'VIEWER',
+      refreshUser
+    }}>
       {children}
     </AuthContext.Provider>
   );

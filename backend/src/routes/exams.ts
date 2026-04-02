@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 import { sendExamReleasedEmail, sendCooldownReleasedEmail } from '../services/mail';
 
 const router = Router();
@@ -98,7 +99,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // POST /api/exams — Create exam
-router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const {
       title, description, questionCount,
@@ -139,7 +140,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 });
 
 // PUT /api/exams/:id — Update exam
-router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const {
       title, description, questionCount,
@@ -183,7 +184,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 });
 
 // PATCH /api/exams/:id/certificate-template — Link template to exam
-router.patch('/:id/certificate-template', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.patch('/:id/certificate-template', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const { certificateTemplateId } = req.body;
@@ -212,7 +213,7 @@ router.patch('/:id/certificate-template', authMiddleware, requireRole('ADMIN'), 
 });
 
 // DELETE /api/exams/:id — Delete exam
-router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.exam.findUnique({ where: { id: req.params.id as string } });
     if (!existing) {
@@ -237,7 +238,7 @@ router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request,
 // =========================================================
 
 // POST /api/exams/:id/releases
-router.post('/:id/releases', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/:id/releases', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const examId = req.params.id;
     const { classId, studentId } = req.body;
@@ -295,7 +296,7 @@ router.post('/:id/releases', authMiddleware, requireRole('ADMIN'), async (req: R
 });
 
 // DELETE /api/exams/:id/releases/:releaseId
-router.delete('/:id/releases/:releaseId', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id/releases/:releaseId', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     const { releaseId } = req.params;
     await prisma.examRelease.delete({ where: { id: releaseId as string } });
@@ -316,7 +317,7 @@ router.delete('/:id/releases/:releaseId', authMiddleware, requireRole('ADMIN'), 
 // =========================================================
 
 // PUT /api/exams/cooldowns/:id/clear
-router.put('/cooldowns/:id/clear', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/cooldowns/:id/clear', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     

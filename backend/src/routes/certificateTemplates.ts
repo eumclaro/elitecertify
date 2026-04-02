@@ -5,6 +5,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // POST /api/certificate-templates
-router.post('/', authMiddleware, requireRole('ADMIN'), upload.single('file'), async (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), upload.single('file'), async (req: Request, res: Response) => {
   try {
     const { name, nameTop, nameLeft, codeTop, codeLeft, dateBottom, dateLeft } = req.body;
     const file = req.file;
@@ -70,7 +71,7 @@ router.get('/', authMiddleware, requireRole('ADMIN'), async (_req: Request, res:
 });
 
 // PUT /api/certificate-templates/:id
-router.put('/:id', authMiddleware, requireRole('ADMIN'), upload.single('file'), async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), upload.single('file'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const { name, nameTop, nameLeft, codeTop, codeLeft, dateBottom, dateLeft } = req.body;
@@ -113,7 +114,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), upload.single('file'), 
 });
 
 // DELETE /api/certificate-templates/:id
-router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
 

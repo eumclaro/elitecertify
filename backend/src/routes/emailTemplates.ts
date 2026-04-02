@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 import { getEmailProvider, getAuthorizedSender, dispatchTemplateToMandrill } from '../services/mail';
 import { EmailEventKey } from '../constants/emailEvents';
 
@@ -33,7 +34,7 @@ router.get('/bindings', authMiddleware, requireRole('ADMIN'), async (req: Reques
 });
 
 // POST /api/email-templates/bindings
-router.post('/bindings', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/bindings', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { eventKey, templateId, internalTemplateId, isActive } = req.body;
 
@@ -65,7 +66,7 @@ router.post('/bindings', authMiddleware, requireRole('ADMIN'), async (req: Reque
 });
 
 // PUT /api/email-templates/:id
-router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { name, htmlContent, status } = req.body;
@@ -87,7 +88,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 });
 
 // POST /api/email-templates/test
-router.post('/test', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/test', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { toEmail, toName, templateSlug, internalTemplateId, dynamicData, subject, eventKey } = req.body;
 

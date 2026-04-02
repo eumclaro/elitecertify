@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { AuthProvider, useAuth } from './contexts/AuthContext'; // Refresh trigger
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
@@ -27,14 +27,9 @@ import CertificateTemplates from './pages/admin/CertificateTemplates';
 import StudentProfile from './pages/student/StudentProfile';
 import StudentNps from './pages/student/StudentNps';
 import ValidateCertificate from './pages/ValidateCertificate';
-
-function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="page-loading"><div className="spinner"></div></div>;
-  if (!user) return <Navigate to="/login" replace />;
-  if (adminOnly && user.role !== 'ADMIN') return <Navigate to="/student/exams" replace />;
-  return <>{children}</>;
-}
+import TeamManagement from './pages/admin/TeamManagement';
+import Profile from './pages/admin/Profile';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -42,26 +37,29 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to={user.role === 'ADMIN' ? '/admin' : '/student/exams'} replace /> : <Login />} />
-      <Route path="/forgot-password" element={user ? <Navigate to={user.role === 'ADMIN' ? '/admin' : '/student/exams'} replace /> : <ForgotPassword />} />
-      <Route path="/reset-password" element={user ? <Navigate to={user.role === 'ADMIN' ? '/admin' : '/student/exams'} replace /> : <ResetPassword />} />
+      <Route path="/login" element={user ? <Navigate to={user.role === 'STUDENT' ? '/student/exams' : '/admin'} replace /> : <Login />} />
+      <Route path="/forgot-password" element={user ? <Navigate to={user.role === 'STUDENT' ? '/student/exams' : '/admin'} replace /> : <ForgotPassword />} />
+      <Route path="/reset-password" element={user ? <Navigate to={user.role === 'STUDENT' ? '/student/exams' : '/admin'} replace /> : <ResetPassword />} />
 
       {/* Admin Routes */}
-      <Route path="/admin" element={<ProtectedRoute adminOnly><Layout><Dashboard /></Layout></ProtectedRoute>} />
-      <Route path="/admin/students" element={<ProtectedRoute adminOnly><Layout><Students /></Layout></ProtectedRoute>} />
-      <Route path="/admin/students/:id" element={<ProtectedRoute adminOnly><Layout><StudentDetail /></Layout></ProtectedRoute>} />
-      <Route path="/admin/classes" element={<ProtectedRoute adminOnly><Layout><Classes /></Layout></ProtectedRoute>} />
-      <Route path="/admin/exams" element={<ProtectedRoute adminOnly><Layout><Exams /></Layout></ProtectedRoute>} />
-      <Route path="/admin/exams/:examId/questions" element={<ProtectedRoute adminOnly><Layout><ExamQuestions /></Layout></ProtectedRoute>} />
-      <Route path="/admin/exams/:examId/releases" element={<ProtectedRoute adminOnly><Layout><ExamReleases /></Layout></ProtectedRoute>} />
-      <Route path="/admin/nps" element={<ProtectedRoute adminOnly><Layout><NpsSurveys /></Layout></ProtectedRoute>} />
-      <Route path="/admin/reports" element={<ProtectedRoute adminOnly><Layout><Reports /></Layout></ProtectedRoute>} />
-      <Route path="/admin/audit" element={<ProtectedRoute adminOnly><Layout><AuditLogs /></Layout></ProtectedRoute>} />
-      <Route path="/admin/smtp" element={<ProtectedRoute adminOnly><Layout><SmtpSettings /></Layout></ProtectedRoute>} />
-      <Route path="/admin/emails" element={<ProtectedRoute adminOnly><Layout><EmailManagement /></Layout></ProtectedRoute>} />
-      <Route path="/admin/dispatches" element={<ProtectedRoute adminOnly><Layout><Dispatches /></Layout></ProtectedRoute>} />
-      <Route path="/admin/events" element={<ProtectedRoute adminOnly><Layout><Events /></Layout></ProtectedRoute>} />
-      <Route path="/admin/certificate-templates" element={<ProtectedRoute adminOnly><Layout><CertificateTemplates /></Layout></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+      <Route path="/admin/profile" element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />
+      <Route path="/admin/team" element={<ProtectedRoute requiredPermission="canManageAdmins"><Layout><TeamManagement /></Layout></ProtectedRoute>} />
+      
+      <Route path="/admin/students" element={<ProtectedRoute><Layout><Students /></Layout></ProtectedRoute>} />
+      <Route path="/admin/students/:id" element={<ProtectedRoute><Layout><StudentDetail /></Layout></ProtectedRoute>} />
+      <Route path="/admin/classes" element={<ProtectedRoute><Layout><Classes /></Layout></ProtectedRoute>} />
+      <Route path="/admin/exams" element={<ProtectedRoute><Layout><Exams /></Layout></ProtectedRoute>} />
+      <Route path="/admin/exams/:examId/questions" element={<ProtectedRoute><Layout><ExamQuestions /></Layout></ProtectedRoute>} />
+      <Route path="/admin/exams/:examId/releases" element={<ProtectedRoute><Layout><ExamReleases /></Layout></ProtectedRoute>} />
+      <Route path="/admin/nps" element={<ProtectedRoute><Layout><NpsSurveys /></Layout></ProtectedRoute>} />
+      <Route path="/admin/reports" element={<ProtectedRoute><Layout><Reports /></Layout></ProtectedRoute>} />
+      <Route path="/admin/audit" element={<ProtectedRoute requiredPermission="canManageAdmins"><Layout><AuditLogs /></Layout></ProtectedRoute>} />
+      <Route path="/admin/smtp" element={<ProtectedRoute requiredPermission="canManageSettings"><Layout><SmtpSettings /></Layout></ProtectedRoute>} />
+      <Route path="/admin/emails" element={<ProtectedRoute requiredPermission="canManageSettings"><Layout><EmailManagement /></Layout></ProtectedRoute>} />
+      <Route path="/admin/dispatches" element={<ProtectedRoute><Layout><Dispatches /></Layout></ProtectedRoute>} />
+      <Route path="/admin/events" element={<ProtectedRoute requiredPermission="canManageMarketing"><Layout><Events /></Layout></ProtectedRoute>} />
+      <Route path="/admin/certificate-templates" element={<ProtectedRoute requiredPermission="canManageSettings"><Layout><CertificateTemplates /></Layout></ProtectedRoute>} />
 
       {/* Student Routes */}
       <Route path="/student/exams" element={<ProtectedRoute><Layout><StudentExams /></Layout></ProtectedRoute>} />
@@ -73,7 +71,7 @@ function AppRoutes() {
       <Route path="/validar/:code" element={<ValidateCertificate />} />
 
       {/* Default redirect */}
-      <Route path="*" element={<Navigate to={user ? (user.role === 'ADMIN' ? '/admin' : '/student/exams') : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={user ? (user.role === 'STUDENT' ? '/student/exams' : '/admin') : '/login'} replace />} />
     </Routes>
   );
 }

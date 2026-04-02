@@ -22,6 +22,7 @@ model User {
   updatedAt         DateTime        @updatedAt @map("updated_at")
   resetToken        String?         @map("reset_token")
   resetTokenExpires DateTime?       @map("reset_token_expires")
+  avatarUrl         String?         @map("avatar_url")
   auditEvents       AuditEvent[]
   npsSurveys        NpsSurvey[]
   student           Student?
@@ -412,7 +413,9 @@ model SystemSetting {
 }
 
 enum Role {
+  SUPER_ADMIN
   ADMIN
+  VIEWER
   STUDENT
 }
 

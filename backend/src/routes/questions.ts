@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 import multer from 'multer';
 import csv from 'csv-parser';
 import { Readable } from 'stream';
@@ -58,7 +59,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // POST /api/exams/:examId/questions/import — Import questions via CSV
-router.post('/import', authMiddleware, requireRole('ADMIN'), upload.single('file'), async (req: Request, res: Response) => {
+router.post('/import', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), upload.single('file'), async (req: Request, res: Response) => {
   try {
     const { examId } = req.params;
     if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
@@ -193,7 +194,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), upload.single('file
 });
 
 // POST /api/exams/:examId/questions — Create question with alternatives
-router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { examId } = req.params;
     const { text, type, order, alternatives } = req.body;
@@ -250,7 +251,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 });
 
 // PUT /api/exams/:examId/questions/:id — Update question
-router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { examId } = req.params;
     const { text, type, order, alternatives } = req.body;
@@ -298,7 +299,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 });
 
 // DELETE /api/exams/:examId/questions/:id — Delete question
-router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     const { examId } = req.params;
     const existing = await prisma.question.findUnique({ where: { id: req.params.id as string } });
@@ -315,7 +316,7 @@ router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request,
 });
 
 // POST /api/exams/:examId/questions/reorder — Reorder questions
-router.post('/reorder', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/reorder', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { orders } = req.body; // [{ id: 'xxx', order: 1 }, ...]
 

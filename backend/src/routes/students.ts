@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 import { sendWelcomeEmail } from '../services/mail';
 
 const router = Router();
@@ -102,7 +103,7 @@ router.get('/:id/cooldowns', authMiddleware, requireRole('ADMIN'), async (req: R
 });
 
 // POST /api/students/import — Import students from a list
-router.post('/import', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/import', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { students } = req.body;
     if (!Array.isArray(students)) {
@@ -203,7 +204,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), async (req: Request
 });
 
 // POST /api/students — Create student
-router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { name, lastName, email, password, cpf, phone, classIds } = req.body;
 
@@ -263,7 +264,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 });
 
 // PUT /api/students/:id — Update student
-router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { name, lastName, email, password, cpf, phone, status, active, classIds } = req.body;
 
@@ -325,7 +326,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 });
 
 // DELETE /api/students/:id — Delete student
-router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     const student = await prisma.student.findUnique({ where: { id: req.params.id as string } });
     if (!student) {
@@ -343,7 +344,7 @@ router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request,
 });
 
 // POST /api/students/:id/resend-access — Generate new password and resend welcome email
-router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const student = await prisma.student.findUnique({
       where: { id: req.params.id as string },
@@ -617,7 +618,7 @@ router.get('/:id/referrals', authMiddleware, requireRole('ADMIN'), async (req: R
 });
 
 // POST /api/students/:id/enroll — Enroll student in a class
-router.post('/:id/enroll', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/:id/enroll', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { classId } = req.body;
     if (!classId) return res.status(400).json({ error: 'ID da turma é obrigatório' });
@@ -641,7 +642,7 @@ router.post('/:id/enroll', authMiddleware, requireRole('ADMIN'), async (req: Req
 });
 
 // DELETE /api/students/:id/unenroll/:classId — Unenroll student from a class
-router.delete('/:id/unenroll/:classId', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id/unenroll/:classId', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     await prisma.classStudent.delete({
       where: {

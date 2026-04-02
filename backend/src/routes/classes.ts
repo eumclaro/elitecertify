@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { checkPermission } from '../middlewares/checkPermission';
 
 const router = Router();
 
@@ -25,7 +26,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // POST /api/classes
-router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { name, description, startDate, endDate } = req.body;
     if (!name) return res.status(400).json({ error: 'Nome é obrigatório' });
@@ -45,7 +46,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res:
 });
 
 // PUT /api/classes/:id
-router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { name, description, startDate, endDate, status } = req.body;
     const cls = await prisma.class.update({
@@ -65,7 +66,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 });
 
 // DELETE /api/classes/:id
-router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     await prisma.class.delete({ where: { id: req.params.id as string } });
     return res.json({ message: 'Turma excluída com sucesso' });
@@ -212,7 +213,7 @@ router.get('/:id/export', authMiddleware, requireRole('ADMIN'), async (req: Requ
 });
 
 // PUT /api/classes/:id/students — Update students in a class
-router.put('/:id/students', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/:id/students', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { studentIds } = req.body;
     

@@ -1,0 +1,14 @@
+{
+  "autoApprove": {
+    "fileChanges": true,
+    "commands": [
+      "npm run dev",
+      "npm run build", 
+      "npm install",
+      "npx prisma migrate dev",
+      "npx prisma generate",
+      "npx prisma db push",
+      "npx tsc --noEmit"
+    ]
+  }
+}

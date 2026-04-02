@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.env.*
+src/assets/certificates/
+src/assets/avatars/
+*.log

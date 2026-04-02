@@ -28,6 +28,7 @@ import CertificateTemplates from './pages/admin/CertificateTemplates';
 import StudentProfile from './pages/student/StudentProfile';
 import StudentNps from './pages/student/StudentNps';
 import ValidateCertificate from './pages/ValidateCertificate';
+import PublicSearch from './pages/PublicSearch';
 import TeamManagement from './pages/admin/TeamManagement';
 import Profile from './pages/admin/Profile';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -71,6 +72,7 @@ function AppRoutes() {
       <Route path="/student/nps/:id" element={<ProtectedRoute><StudentNps /></ProtectedRoute>} />
       <Route path="/student/event/:id" element={<ProtectedRoute><Layout><StudentEventDetail /></Layout></ProtectedRoute>} />
       <Route path="/validar/:code" element={<ValidateCertificate />} />
+      <Route path="/certificados" element={<PublicSearch />} />
 
       {/* Default redirect */}
       <Route path="*" element={<Navigate to={user ? (user.role === 'STUDENT' ? '/student/exams' : '/admin') : '/login'} replace />} />

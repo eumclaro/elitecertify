@@ -1,0 +1,48 @@
+export const PERMISSIONS = {
+  SUPER_ADMIN: {
+    canCreate: true,
+    canEdit: true,
+    canDelete: true,
+    canManageAdmins: true,
+    canSendEmails: true,
+    canViewReports: true,
+    canCorrectEssays: true,
+    canManageSettings: true,
+    canManageMarketing: true,
+  },
+  ADMIN: {
+    canCreate: true,
+    canEdit: true,
+    canDelete: false,       
+    canManageAdmins: false,
+    canSendEmails: true,
+    canViewReports: true,
+    canCorrectEssays: true,
+    canManageSettings: false,
+    canManageMarketing: true,
+  },
+  VIEWER: {
+    canCreate: false,
+    canEdit: false,
+    canDelete: false,
+    canManageAdmins: false,
+    canSendEmails: false,
+    canViewReports: true,
+    canCorrectEssays: true,
+    canManageSettings: false,
+    canManageMarketing: false,
+  },
+  STUDENT: {
+    canCreate: false,
+    canEdit: false,
+    canDelete: false,
+    canManageAdmins: false,
+    canSendEmails: false,
+    canViewReports: false,
+    canCorrectEssays: false,
+    canManageSettings: false,
+    canManageMarketing: false,
+  },
+} as const;
+
+export type PermissionKey = keyof typeof PERMISSIONS.SUPER_ADMIN;

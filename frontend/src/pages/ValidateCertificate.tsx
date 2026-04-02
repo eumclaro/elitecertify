@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle2, XCircle, Award, Calendar, Hash, User, ShieldCheck, ExternalLink } from 'lucide-react';
+import { CheckCircle2, XCircle, Award, Calendar, Hash, User, LogIn } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -52,13 +52,15 @@ export default function ValidateCertificate() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex flex-col items-center justify-center p-4">
       {/* Brand Header */}
-      <div className="mb-8 flex flex-col items-center gap-4 text-center">
-        <div className="size-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
-          <ShieldCheck className="size-8 text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 uppercase italic">Elite Certify</h1>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Portal de Autenticidade</p>
+      <div className="mb-10 flex flex-col items-center gap-2 text-center animate-in fade-in slide-in-from-top-4 duration-700">
+        <img 
+          src="/logotipo-elite-black.png" 
+          alt="Elite Training Logo" 
+          className="h-16 w-auto object-contain mb-2"
+        />
+        <div className="space-y-1">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Portal de Autenticidade</p>
+          <div className="h-px w-12 bg-slate-200 mx-auto mt-2 opacity-50" />
         </div>
       </div>
 
@@ -139,9 +141,9 @@ export default function ValidateCertificate() {
                 </div>
                 
                 <Button variant="ghost" size="sm" asChild className="gap-2 text-slate-600 hover:text-primary group">
-                   <a href="https://elitetraining.com.br" target="_blank" rel="noopener noreferrer">
-                      Elite Training <ExternalLink className="size-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                   </a>
+                   <Link to="/login">
+                      Login <LogIn className="size-3 transition-transform group-hover:translate-x-0.5" />
+                   </Link>
                 </Button>
               </div>
             </CardContent>

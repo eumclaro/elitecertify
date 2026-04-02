@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Lock, Mail } from "lucide-react";
+import { Loader2, Lock, Mail, Search } from "lucide-react";
 import api from '../services/api';
 
 export default function Login() {
@@ -151,6 +151,16 @@ export default function Login() {
             {" "}e{" "}
             <a href="#" className="underline underline-offset-4 hover:text-slate-900 transition-colors font-medium">Política de Privacidade</a>.
           </p>
+
+          <div className="mt-8 pt-8 border-t border-slate-100 text-center">
+            <Link 
+              to="/certificados" 
+              className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full hover:bg-emerald-100 transition-colors shadow-sm border border-emerald-100/50"
+            >
+              <Search className="size-3" />
+              Verificar autenticidade de um certificado
+            </Link>
+          </div>
         </div>
       </div>
     </div>

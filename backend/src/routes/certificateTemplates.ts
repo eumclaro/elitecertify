@@ -69,10 +69,53 @@ router.get('/', authMiddleware, requireRole('ADMIN'), async (_req: Request, res:
   }
 });
 
+// PUT /api/certificate-templates/:id
+router.put('/:id', authMiddleware, requireRole('ADMIN'), upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { name, nameTop, nameLeft, codeTop, codeLeft, dateBottom, dateLeft } = req.body;
+    const file = req.file;
+
+    const existing = await prisma.certificateTemplate.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Template não encontrado.' });
+    }
+
+    const dataToUpdate: any = {};
+    if (name) dataToUpdate.name = name;
+    if (nameTop !== undefined) dataToUpdate.nameTop = parseFloat(nameTop);
+    if (nameLeft !== undefined) dataToUpdate.nameLeft = parseFloat(nameLeft);
+    if (codeTop !== undefined) dataToUpdate.codeTop = parseFloat(codeTop);
+    if (codeLeft !== undefined) dataToUpdate.codeLeft = parseFloat(codeLeft);
+    if (dateBottom !== undefined) dataToUpdate.dateBottom = parseFloat(dateBottom);
+    if (dateLeft !== undefined) dataToUpdate.dateLeft = parseFloat(dateLeft);
+
+    if (file) {
+      dataToUpdate.fileName = file.filename;
+      try {
+        const oldFilePath = path.join(uploadDir, existing.fileName);
+        if (fs.existsSync(oldFilePath)) fs.unlinkSync(oldFilePath);
+      } catch (err) {
+        console.error('Failed to clear old tempalte file:', err);
+      }
+    }
+
+    const template = await prisma.certificateTemplate.update({
+      where: { id },
+      data: dataToUpdate
+    });
+
+    return res.json(template);
+  } catch (error) {
+    console.error('Error updating certificate template:', error);
+    return res.status(500).json({ error: 'Erro ao atualizar template de certificado.' });
+  }
+});
+
 // DELETE /api/certificate-templates/:id
 router.delete('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const template = await prisma.certificateTemplate.findUnique({
       where: { id },

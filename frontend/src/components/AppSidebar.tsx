@@ -14,6 +14,7 @@ import {
   Search,
   Send,
   CalendarDays,
+  Medal,
 } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
@@ -44,6 +45,7 @@ const adminLinks = [
   { path: '/admin/nps', label: 'NPS', icon: BarChart3 },
   { path: '/admin/reports', label: 'Relatórios', icon: ClipboardList },
   { path: '/admin/audit', label: 'Auditoria', icon: Lock },
+  { path: '/admin/certificate-templates', label: 'Templates de Certificado', icon: Medal },
   { path: '/admin/smtp', label: 'Settings', icon: Settings },
   { path: '/admin/emails', label: 'Templates de E-mail', icon: Mail },
   { path: '/admin/dispatches', label: 'Disparos', icon: Send },

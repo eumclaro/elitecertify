@@ -140,9 +140,18 @@ export default function Exams() {
     try {
       if (editing) {
         await api.put(`/exams/${editing.id}`, form);
+        await api.patch(`/exams/${editing.id}/certificate-template`, {
+          certificateTemplateId: form.certificateTemplateId
+        });
         toast.success("Prova atualizada");
       } else {
-        await api.post('/exams', form);
+        const res = await api.post('/exams', form);
+        const newExamId = res.data.id || res.data._id || res.data.examId;
+        if (newExamId) {
+          await api.patch(`/exams/${newExamId}/certificate-template`, {
+            certificateTemplateId: form.certificateTemplateId
+          });
+        }
         toast.success("Prova criada");
       }
       setShowModal(false);

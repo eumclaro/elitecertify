@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { env } from './config/env';
+import path from 'path';
 
 import authRoutes from './routes/auth';
 import studentRoutes from './routes/students';
@@ -61,6 +62,9 @@ app.use('/api/internal-templates', internalTemplatesRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/certificate-templates', certificateTemplatesRoutes);
+
+// Static assets
+app.use('/uploads/certificates', express.static(path.join(__dirname, 'assets/certificates')));
 
 // 404
 app.use((_req, res) => {

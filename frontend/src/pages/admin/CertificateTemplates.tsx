@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Plus, Trash2, Loader2, Image as ImageIcon, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CertificateTemplate {
@@ -42,6 +42,8 @@ export default function CertificateTemplates() {
 
   // Modal
   const [showModal, setShowModal] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<CertificateTemplate | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,7 +63,23 @@ export default function CertificateTemplates() {
   useEffect(() => { fetchTemplates(); }, []);
 
   const openNew = () => {
+    setEditingTemplate(null);
     setForm(defaultForm);
+    setFile(null);
+    setShowModal(true);
+  };
+
+  const openEdit = (tpl: CertificateTemplate) => {
+    setEditingTemplate(tpl);
+    setForm({
+      name: tpl.name,
+      nameTop: tpl.nameTop.toString(),
+      nameLeft: tpl.nameLeft.toString(),
+      codeTop: tpl.codeTop.toString(),
+      codeLeft: tpl.codeLeft.toString(),
+      dateBottom: tpl.dateBottom.toString(),
+      dateLeft: tpl.dateLeft.toString(),
+    });
     setFile(null);
     setShowModal(true);
   };
@@ -71,7 +89,7 @@ export default function CertificateTemplates() {
       toast.error('O nome do template é obrigatório');
       return;
     }
-    if (!file) {
+    if (!editingTemplate && !file) {
       toast.error('Você deve selecionar um arquivo de imagem (JPG)');
       return;
     }
@@ -80,7 +98,7 @@ export default function CertificateTemplates() {
     try {
       const formData = new FormData();
       formData.append('name', form.name);
-      formData.append('file', file);
+      if (file) formData.append('file', file);
       formData.append('nameTop', form.nameTop);
       formData.append('nameLeft', form.nameLeft);
       formData.append('codeTop', form.codeTop);
@@ -88,17 +106,22 @@ export default function CertificateTemplates() {
       formData.append('dateBottom', form.dateBottom);
       formData.append('dateLeft', form.dateLeft);
 
-      await api.post('/certificate-templates', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      if (editingTemplate) {
+        await api.put(`/certificate-templates/${editingTemplate.id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        toast.success('Template atualizado com sucesso');
+      } else {
+        await api.post('/certificate-templates', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        toast.success('Template criado com sucesso');
+      }
       
-      toast.success('Template criado com sucesso');
       setShowModal(false);
       fetchTemplates();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Erro ao criar template');
+      toast.error(error.response?.data?.error || 'Erro ao salvar template');
     } finally {
       setSaving(false);
     }
@@ -155,8 +178,16 @@ export default function CertificateTemplates() {
               templates.map(tpl => (
                 <TableRow key={tpl.id}>
                   <TableCell className="px-6">
-                    <div className="size-10 bg-muted rounded flex items-center justify-center text-muted-foreground">
-                      <ImageIcon className="size-5" />
+                    <div 
+                      className="size-10 bg-muted rounded flex items-center justify-center text-muted-foreground overflow-hidden cursor-pointer border hover:border-primary transition-colors group"
+                      onClick={() => tpl.fileName && setLightboxImage(`/uploads/certificates/${tpl.fileName}`)}
+                      title="Clique para ampliar"
+                    >
+                      {tpl.fileName ? (
+                         <img src={`/uploads/certificates/${tpl.fileName}`} alt={tpl.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                      ) : (
+                         <ImageIcon className="size-5" />
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="px-6 font-medium">
@@ -168,7 +199,10 @@ export default function CertificateTemplates() {
                   <TableCell className="px-6 text-sm text-muted-foreground">
                     {new Date(tpl.createdAt).toLocaleDateString('pt-BR')}
                   </TableCell>
-                  <TableCell className="px-6">
+                  <TableCell className="px-6 space-x-2">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(tpl)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                      <Edit2 className="size-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(tpl.id, tpl.name)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
                       <Trash2 className="size-4" />
                     </Button>
@@ -184,7 +218,7 @@ export default function CertificateTemplates() {
       <Dialog open={showModal} onOpenChange={open => { if (!saving) setShowModal(open); }}>
         <DialogContent className="sm:max-w-[580px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Template</DialogTitle>
+            <DialogTitle>{editingTemplate ? 'Editar Template' : 'Novo Template'}</DialogTitle>
             <DialogDescription>
               Faça o upload da imagem de fundo (JPG/PNG tamanho A4 Paisagem) e ajuste as coordenadas absolutas (em %).
             </DialogDescription>
@@ -196,7 +230,7 @@ export default function CertificateTemplates() {
             </div>
             
             <div className="space-y-1.5">
-              <Label>Imagem do Template *</Label>
+              <Label>Imagem do Template {editingTemplate ? '(Opcional)' : '*'}</Label>
               <Input type="file" accept="image/jpeg, image/png" onChange={e => setFile(e.target.files?.[0] || null)} />
             </div>
 
@@ -242,9 +276,18 @@ export default function CertificateTemplates() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)} disabled={saving}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="size-4 animate-spin" /> : 'Criar Template'}
+              {saving ? <Loader2 className="size-4 animate-spin" /> : editingTemplate ? 'Salvar Template' : 'Criar Template'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lightbox / Preview Visial *) */}
+      <Dialog open={!!lightboxImage} onOpenChange={(o) => { if (!o) setLightboxImage(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-1 bg-transparent border-none shadow-none [&>button]:bg-background [&>button]:rounded-full [&>button]:p-2 [&>button]:right-2 [&>button]:top-2">
+          {lightboxImage && (
+             <img src={lightboxImage} alt="Template Preview" className="w-full h-auto max-h-[85vh] object-contain rounded-xl shadow-2xl bg-background" />
+          )}
         </DialogContent>
       </Dialog>
     </div>

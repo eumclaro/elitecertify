@@ -5,6 +5,26 @@ import { encrypt } from '../utils/crypto';
 import nodemailer from 'nodemailer';
 import { getEmailProvider } from '../services/mail';
 import { EMAIL_MAPPINGS } from '../constants/emailEvents';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, '../assets/system');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    cb(null, 'login-cover.jpg');
+  }
+});
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 
 const router = Router();
 
@@ -130,6 +150,36 @@ router.post('/mandrill/test', authMiddleware, requireRole('ADMIN'), async (req: 
   } catch (err: any) {
     console.error('[SETTINGS] Mandrill Test Error:', err);
     return res.status(400).json({ error: err.message || 'Falha ao conectar com a API do Mandrill.' });
+  }
+});
+// GET /api/settings/login-cover
+router.get('/login-cover', async (req: Request, res: Response) => {
+  try {
+    const setting = await prisma.systemSetting.findUnique({ where: { key: 'login_cover_image' } });
+    if (setting && setting.value) {
+      return res.json({ url: setting.value });
+    }
+    return res.json({ url: null });
+  } catch (err) {
+    return res.status(500).json({ error: 'Erro ao buscar imagem de login' });
+  }
+});
+
+// POST /api/settings/login-cover
+router.post('/login-cover', authMiddleware, requireRole('ADMIN'), upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    }
+    const url = `/assets/system/${req.file.filename}?t=${Date.now()}`;
+    await prisma.systemSetting.upsert({
+      where: { key: 'login_cover_image' },
+      update: { value: url, updatedBy: req.user?.userId },
+      create: { key: 'login_cover_image', value: url, updatedBy: req.user?.userId }
+    });
+    return res.json({ message: 'Imagem atualizada', url });
+  } catch (err) {
+    return res.status(500).json({ error: 'Erro ao fazer upload de imagem' });
   }
 });
 

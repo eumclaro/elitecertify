@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppSidebar } from './AppSidebar';
 import {
@@ -14,9 +14,15 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { user } = useAuth();
+  
+  const [defaultOpen] = useState(() => {
+    const match = document.cookie.match(new RegExp('(^| )sidebar_state=([^;]+)'));
+    if (match) return match[2] === 'true';
+    return false;
+  });
 
   return (
-    <SidebarProvider defaultOpen={false} style={{ '--sidebar-width-icon': '4.5rem' } as React.CSSProperties}>
+    <SidebarProvider defaultOpen={defaultOpen} style={{ '--sidebar-width-icon': '4.5rem' } as React.CSSProperties}>
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 transition-all duration-200">

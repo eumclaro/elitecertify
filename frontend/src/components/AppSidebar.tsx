@@ -28,7 +28,6 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
-  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
@@ -61,7 +60,7 @@ export function AppSidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { setOpen } = useSidebar();
+
   const isAdmin = user?.role === 'ADMIN';
 
   const navLinks = isAdmin ? adminLinks : studentLinks;
@@ -80,8 +79,6 @@ export function AppSidebar() {
     <Sidebar 
       collapsible="icon" 
       variant="sidebar"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
       className="transition-all duration-300"
     >
       <SidebarHeader className="border-b border-sidebar-border h-20 flex items-center justify-center px-2 overflow-hidden">

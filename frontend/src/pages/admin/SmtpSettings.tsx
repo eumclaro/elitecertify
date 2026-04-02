@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
+import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Loader2, Mail, Image as ImageIcon, Upload } from "lucide-react";
 
-export default function SmtpSettings() {
+export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   
   const [form, setForm] = useState({
     host: '',
@@ -17,156 +25,245 @@ export default function SmtpSettings() {
   const [hasPassword, setHasPassword] = useState(false);
   const [showPass, setShowPass] = useState(false);
   
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const [loginCoverUrl, setLoginCoverUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetchConfig();
+    fetchConfigs();
   }, []);
 
-  const fetchConfig = async () => {
+  const fetchConfigs = async () => {
     try {
-      const { data } = await api.get('/settings/smtp');
-      if (data.hasPassword !== undefined) {
+      setLoading(true);
+      const [smtpRes, coverRes] = await Promise.all([
+        api.get('/settings/smtp'),
+        api.get('/settings/login-cover')
+      ]);
+
+      if (smtpRes.data.hasPassword !== undefined) {
         setForm({
-          host: data.host || '',
-          port: data.port || '',
-          user: data.user || '',
-          pass: '', // field should remain empty unless they want to change it
-          fromEmail: data.fromEmail || '',
-          fromName: data.fromName || ''
+          host: smtpRes.data.host || '',
+          port: smtpRes.data.port || '',
+          user: smtpRes.data.user || '',
+          pass: '', 
+          fromEmail: smtpRes.data.fromEmail || '',
+          fromName: smtpRes.data.fromName || ''
         });
-        setHasPassword(data.hasPassword);
+        setHasPassword(smtpRes.data.hasPassword);
       }
+
+      setLoginCoverUrl(coverRes.data.url);
     } catch (err: any) {
-      alert('Erro ao carregar configurações SMTP.');
+      toast.error('Erro ao carregar configurações.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSaveSmtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setFeedback(null);
     try {
       await api.put('/settings/smtp', form);
-      setFeedback({ type: 'success', message: 'Configurações SMTP gravadas e criptografadas com sucesso no banco de dados!' });
-      fetchConfig();
+      toast.success('Configurações SMTP gravadas e criptografadas com sucesso!');
+      fetchConfigs();
     } catch (err: any) {
-      setFeedback({ type: 'error', message: err.response?.data?.error || 'Erro ao salvar configurações.' });
+      toast.error(err.response?.data?.error || 'Erro ao salvar configurações SMTP.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleTest = async () => {
+  const handleTestSmtp = async () => {
     setTesting(true);
-    setFeedback(null);
     try {
       const { data } = await api.post('/settings/smtp/test', form);
-      setFeedback({ type: 'success', message: data.message || 'Teste concluído com sucesso! Verifique o e-mail.' });
+      toast.success(data.message || 'Teste concluído com sucesso!');
     } catch (err: any) {
-      setFeedback({ type: 'error', message: err.response?.data?.error || 'Erro ao realizar teste de SMTP. Verifique os dados digitados.' });
+      toast.error(err.response?.data?.error || 'Erro ao realizar teste de SMTP.');
     } finally {
       setTesting(false);
     }
   };
 
-  if (loading) return <div className="page-loading"><div className="spinner"></div></div>;
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione apenas arquivos de imagem (JPG, PNG).');
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const { data } = await api.post('/settings/login-cover', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      toast.success('Imagem de login atualizada com sucesso!');
+      setLoginCoverUrl(data.url);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Erro ao enviar imagem de login.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
-    <div className="smtp-settings-page">
-      <div className="page-header">
-        <div>
-          <h2>Configurações SMTP</h2>
-          <p>Gerencie as credenciais do servidor de e-mail transacional (Mailchimp/Mandrill)</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Configurações Base</h2>
+        <p className="text-muted-foreground text-sm">
+          Gerencie as integrações de e-mail e a interface de acesso do aluno.
+        </p>
       </div>
 
-      {feedback && (
-        <div style={{
-          padding: '1rem 1.25rem',
-          marginBottom: '1.5rem',
-          borderRadius: '8px',
-          backgroundColor: feedback.type === 'success' ? '#042f2e' : '#450a0a',
-          color: feedback.type === 'success' ? '#34d399' : '#fca5a5',
-          border: `1px solid ${feedback.type === 'success' ? '#059669' : '#ef4444'}`,
-          maxWidth: '800px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
-          fontSize: '0.95rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-        }}>
-          <span style={{ fontSize: '1.25rem' }}>{feedback.type === 'success' ? '✅' : '⚠️'}</span>
-          <span style={{ flex: 1, fontWeight: '500' }}>{feedback.message}</span>
-          <button type="button" onClick={() => setFeedback(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.7, padding: '4px' }}>✕</button>
-        </div>
-      )}
+      <Tabs defaultValue="appearance" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="appearance" className="gap-2"><ImageIcon className="w-4 h-4"/> Interfaces / App</TabsTrigger>
+          <TabsTrigger value="smtp" className="gap-2"><Mail className="w-4 h-4"/> E-mail SMTP</TabsTrigger>
+        </TabsList>
 
-      <div style={{ maxWidth: '800px', backgroundColor: '#1e293b', padding: '2rem', borderRadius: '8px', border: '1px solid #334155' }}>
-        <form onSubmit={handleSave}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-            <div className="form-group">
-              <label>Servidor (Host)</label>
-              <input type="text" value={form.host} onChange={e => setForm({ ...form, host: e.target.value })} required 
-                placeholder="Ex: smtp.mandrillapp.com" style={{ width: '100%', padding: '0.75rem', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc' }} />
-            </div>
-            <div className="form-group">
-              <label>Porta (Port)</label>
-              <input type="number" value={form.port} onChange={e => setForm({ ...form, port: e.target.value })} required 
-                placeholder="Ex: 587 ou 465" style={{ width: '100%', padding: '0.75rem', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc' }} />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-            <div className="form-group">
-              <label>Nome do Remetente</label>
-              <input type="text" value={form.fromName} onChange={e => setForm({ ...form, fromName: e.target.value })} required 
-                placeholder="Ex: ELT Training" style={{ width: '100%', padding: '0.75rem', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc' }} />
-            </div>
-            <div className="form-group">
-              <label>E-mail do Remetente</label>
-              <input type="email" value={form.fromEmail} onChange={e => setForm({ ...form, fromEmail: e.target.value })} required 
-                placeholder="Ex: no-reply@elt.com.br" style={{ width: '100%', padding: '0.75rem', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc' }} />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-            <div className="form-group">
-              <label>Usuário SMTP</label>
-              <input type="text" value={form.user} onChange={e => setForm({ ...form, user: e.target.value })} required 
-                placeholder="Usuário ou API Key Name" style={{ width: '100%', padding: '0.75rem', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc' }} />
-            </div>
-            <div className="form-group">
-              <label>
-                Senha / API Key Secret
-                {hasPassword && !form.pass && <span style={{ marginLeft: '10px', fontSize: '0.8rem', color: '#10b981' }}>(Salva no sistema)</span>}
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input type={showPass ? "text" : "password"} value={form.pass} 
-                  onChange={e => setForm({ ...form, pass: e.target.value })} 
-                  required={!hasPassword}
-                  placeholder={hasPassword ? 'Preencha apenas para alterar...' : 'Senha do SMTP'} 
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc' }} />
-                <button type="button" onClick={() => setShowPass(!showPass)}
-                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                  {showPass ? 'Ocultar' : 'Mostrar'}
-                </button>
+        {/* Tab Aparencia */}
+        <TabsContent value="appearance" className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
+          <Card>
+            <CardHeader>
+              <CardTitle>Imagem da Tela de Login</CardTitle>
+              <CardDescription>
+                Esta imagem será exibida no painel esquerdo da tela de entrada dos alunos e administradores. Recomenda-se imagens na vertical para melhor conversão.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-8 items-start">
+                <div className="flex flex-col gap-4 w-full md:w-1/2">
+                  <div className="flex items-center justify-center w-full min-h-[300px] border-2 border-dashed rounded-lg bg-muted/20 relative overflow-hidden group">
+                    {loginCoverUrl ? (
+                      <img 
+                        src={`${import.meta.env.VITE_API_URL}${loginCoverUrl}`} 
+                        alt="Login Cover Preview" 
+                        className="w-full h-full object-cover absolute inset-0"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-muted-foreground p-8 text-center bg-[#1a1a1a] w-full h-[300px] absolute inset-0">
+                         <img src="/logotipo-elite-training.png" className="h-12 opacity-50 grayscale mix-blend-overlay" alt="placeholder" />
+                      </div>
+                    )}
+                    
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                       <Button variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                         {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Upload className="w-4 h-4 mr-2"/>}
+                         Substituir Imagem
+                       </Button>
+                    </div>
+                  </div>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    onChange={handleFileChange}
+                    accept="image/png, image/jpeg, image/jpg, image/webp" 
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Formatos aceitos: JPG, PNG. O arquivo substituirá o anterior automaticamente.
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-start', gap: '1rem', paddingTop: '1rem', borderTop: '1px solid #334155' }}>
-            <button type="button" className="btn btn-secondary" onClick={handleTest} disabled={testing || saving}>
-              {testing ? 'Despachando Ensaio...' : '🧪 Testar Disparo'}
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={saving || testing}>
-              {saving ? 'Gravando...' : '💾 Gravar Definições'}
-            </button>
-          </div>
-        </form>
-      </div>
+
+        {/* Tab SMTP */}
+        <TabsContent value="smtp" className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
+          <Card>
+            <form onSubmit={handleSaveSmtp}>
+              <CardHeader>
+                <CardTitle>Credenciais do Servidor SMTP</CardTitle>
+                <CardDescription>
+                  Serviço de disparo que enviará e-mails transacionais pela plataforma (Mandrill/Mailchimp).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Servidor (Host)</Label>
+                    <Input placeholder="Ex: smtp.mandrillapp.com" value={form.host} onChange={e => setForm({ ...form, host: e.target.value })} required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Porta (Port)</Label>
+                    <Input type="number" placeholder="Ex: 587" value={form.port} onChange={e => setForm({ ...form, port: e.target.value })} required />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Nome do Remetente</Label>
+                    <Input placeholder="Ex: Elite Certify" value={form.fromName} onChange={e => setForm({ ...form, fromName: e.target.value })} required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>E-mail do Remetente</Label>
+                    <Input type="email" placeholder="Ex: noreply@empresa.com.br" value={form.fromEmail} onChange={e => setForm({ ...form, fromEmail: e.target.value })} required />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Usuário SMTP</Label>
+                    <Input placeholder="API Key Name" value={form.user} onChange={e => setForm({ ...form, user: e.target.value })} required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="flex items-center gap-2">
+                      Senha / Secret Key
+                      {hasPassword && !form.pass && <span className="text-xs text-primary">(Salva do db)</span>}
+                    </Label>
+                    <div className="flex relative">
+                      <Input 
+                        type={showPass ? "text" : "password"} 
+                        value={form.pass} 
+                        onChange={e => setForm({ ...form, pass: e.target.value })} 
+                        required={!hasPassword}
+                        placeholder={hasPassword ? 'Preencha apenas se for alterar...' : 'Senha do SMTP'} 
+                        className="pr-16"
+                      />
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        className="absolute right-0 top-0 h-9 px-3 text-xs" 
+                        onClick={() => setShowPass(!showPass)}>
+                        {showPass ? 'GHOST' : 'Ver'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex gap-2 border-t pt-6 bg-muted/20">
+                <Button type="button" variant="outline" onClick={handleTestSmtp} disabled={testing || saving}>
+                  {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : null}
+                  Testar Disparo
+                </Button>
+                <Button type="submit" disabled={saving || testing}>
+                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : null}
+                  Gravar Definições
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

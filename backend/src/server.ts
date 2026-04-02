@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { env } from './config/env';
 import path from 'path';
+import fs from 'fs';
 
 import authRoutes from './routes/auth';
 import studentRoutes from './routes/students';
@@ -64,6 +65,11 @@ app.use('/api/certificates', certificateRoutes);
 app.use('/api/certificate-templates', certificateTemplatesRoutes);
 
 // Static assets
+const systemAssetsPath = path.join(__dirname, 'assets/system');
+if (!fs.existsSync(systemAssetsPath)) {
+  fs.mkdirSync(systemAssetsPath, { recursive: true });
+}
+app.use('/assets/system', express.static(systemAssetsPath));
 app.use('/uploads/certificates', express.static(path.join(__dirname, 'assets/certificates')));
 
 // 404

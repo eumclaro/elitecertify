@@ -28,10 +28,21 @@ router.get('/:code/pdf', authMiddleware, async (req: Request, res: Response) => 
 
     // Apenas o próprio aluno ou admin podem baixar
     const requestingUserId = (req as any).user.userId;
-    const isOwner = certificate.student.userId === requestingUserId;
-    const isAdmin = (req as any).user.role === 'ADMIN';
+    const userRole = (req as any).user.role;
     
+    const isOwner = certificate.student.userId === requestingUserId;
+    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+    
+    console.log(`[CertificatePDF] Auth Check:`);
+    console.log(`  - Code: ${code}`);
+    console.log(`  - Requesting User ID: ${requestingUserId}`);
+    console.log(`  - Owner (Student) User ID: ${certificate.student.userId}`);
+    console.log(`  - User Role: ${userRole}`);
+    console.log(`  - Is Owner: ${isOwner}`);
+    console.log(`  - Is Admin/Super: ${isAdmin}`);
+
     if (!isOwner && !isAdmin) {
+      console.warn(`[CertificatePDF] Access Denied for User ${requestingUserId} on Certificate ${code}`);
       return res.status(403).json({ error: 'Acesso negado.' });
     }
 

@@ -7,9 +7,15 @@ import { startOfDay, endOfDay, subDays, format, startOfWeek } from 'date-fns';
 
 const router = Router();
 
+// Help for type-safe query parameters
+const qs = (val: unknown): string | undefined =>
+  Array.isArray(val) ? (val[0] as string) : (val as string | undefined);
+
 // Helper to get date range
 const getDateRange = (req: Request) => {
-  const { from, to, period } = req.query;
+  const from = qs(req.query.from);
+  const to = qs(req.query.to);
+  const period = qs(req.query.period);
 
   let startDate = subDays(new Date(), 30);
   let endDate = new Date();
@@ -18,8 +24,8 @@ const getDateRange = (req: Request) => {
   else if (period === '30d') startDate = subDays(new Date(), 30);
   else if (period === '90d') startDate = subDays(new Date(), 90);
   else if (from && to) {
-    startDate = new Date(from as string);
-    endDate = new Date(to as string);
+    startDate = new Date(from);
+    endDate = new Date(to);
   }
 
   return {
@@ -142,11 +148,11 @@ router.get('/charts/performance', authMiddleware, requireRole('ADMIN'), async (r
 // ============================================================
 router.get('/class/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = qs(req.params.id);
     const { start, end } = getDateRange(req);
 
     const classData: any = await prisma.class.findUnique({
-      where: { id },
+      where: { id: id as string },
       include: {
         students: {
           include: {
@@ -181,7 +187,7 @@ router.get('/class/:id', authMiddleware, requireRole('ADMIN'), async (req: Reque
       where: {
         score: { not: null },
         response: { 
-          survey: { classId: id as string },
+          survey: { classId: id },
           createdAt: { gte: start, lte: end }
         }
       },
@@ -231,11 +237,11 @@ router.get('/class/:id', authMiddleware, requireRole('ADMIN'), async (req: Reque
 // ============================================================
 router.get('/exam/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = qs(req.params.id);
     const { start, end } = getDateRange(req);
 
     const exam: any = await prisma.exam.findUnique({
-      where: { id },
+      where: { id: id as string },
       include: {
         attempts: {
           where: { 
@@ -267,7 +273,7 @@ router.get('/exam/:id', authMiddleware, requireRole('ADMIN'), async (req: Reques
     const missedQuestions: any[] = await (prisma.answer as any).groupBy({
       by: ['questionId'],
       where: {
-        attempt: { examId: id as string, finishedAt: { gte: start, lte: end } },
+        attempt: { examId: id, finishedAt: { gte: start, lte: end } },
         isCorrect: false
       },
       _count: { id: true },
@@ -401,8 +407,8 @@ router.get('/nps', authMiddleware, requireRole('ADMIN'), async (req: Request, re
 // ============================================================
 router.get('/export/excel', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const type = req.query.type as string;
-    const id = req.query.id as string;
+    const type = qs(req.query.type);
+    const id = qs(req.query.id);
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Relatório');
 
@@ -474,8 +480,8 @@ router.get('/export/excel', authMiddleware, requireRole('ADMIN'), async (req: Re
 router.get('/export/pdf', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   let browser;
   try {
-    const type = req.query.type as string;
-    const id = req.query.id as string;
+    const type = qs(req.query.type);
+    const id = qs(req.query.id);
     let title = 'Relatório Geral';
     let rows: any[] = [];
     let headers: string[] = [];

@@ -12,6 +12,7 @@ services:
       - NODE_ENV=production
     networks:
       - app
+      - coolify
     restart: unless-stopped
 
   frontend:
@@ -27,3 +28,5 @@ services:
 networks:
   app:
     driver: bridge
+  coolify:
+    external: true

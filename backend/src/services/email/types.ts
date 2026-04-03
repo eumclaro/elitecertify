@@ -10,6 +10,11 @@ export interface SendTemplateOptions {
   fromEmail?: string;
   fromName?: string;
   htmlContent?: string;
+  attachment?: {
+    filename: string;
+    content: string; // Base64
+    type: string;    // application/pdf
+  };
 }
 
 export interface IEmailProvider {

@@ -100,6 +100,7 @@ model Exam {
   status          ExamStatus    @default(DRAFT)
   certificateTemplateId String? @map("certificate_template_id")
   certificateTemplate   CertificateTemplate? @relation(fields: [certificateTemplateId], references: [id])
+  webhookUrl     String?       @map("webhook_url")
   certificates    Certificate[]
   cooldowns       Cooldown[]
   attempts        ExamAttempt[]
@@ -338,7 +339,8 @@ model EmailLog {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   dispatchId    String?   @map("dispatch_id")
-  dispatch      Dispatch? @relation(fields: [dispatchId], references: [id])
+  dispatch        Dispatch? @relation(fields: [dispatchId], references: [id])
+  certificateCode String?   @map("certificate_code")
 
   @@index([mandrillMsgId])
   @@index([recipient])

@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer'
 import path from 'path'
 import fs from 'fs'
 import prisma from '../config/database'
+import { dispatchTemplateToMandrill } from './mail'
 
 interface CertificateData {
   studentName: string
@@ -137,4 +138,63 @@ export async function generateCertificateCode(): Promise<string> {
   }
 
   return `ELT-${code}`
+}
+
+/**
+ * Envia o certificado em PDF por e-mail para o aluno
+ */
+export async function sendCertificateByEmail(
+  certificateCode: string,
+  studentEmail: string,
+  studentName: string
+): Promise<void> {
+  try {
+    const certificate = await prisma.certificate.findUnique({
+      where: { code: certificateCode },
+      include: {
+        student: { include: { user: true } },
+        exam: { include: { certificateTemplate: true } }
+      }
+    })
+
+    if (!certificate) {
+      throw new Error(`Certificado não encontrado: ${certificateCode}`)
+    }
+
+    const pdfBuffer = await generateCertificatePdf({
+      studentName: `${certificate.student.user.name} ${certificate.student.lastName || ''}`.trim(),
+      certifiedId: certificate.code,
+      issuedAt: certificate.issuedAt,
+      templateFile: certificate.exam.certificateTemplate?.fileName || 'padrao.jpg',
+      nameTop: certificate.exam.certificateTemplate?.nameTop || 53.1,
+      nameLeft: certificate.exam.certificateTemplate?.nameLeft || 14.2,
+      codeTop: certificate.exam.certificateTemplate?.codeTop || 72.1,
+      codeLeft: certificate.exam.certificateTemplate?.codeLeft || 59.1,
+      dateBottom: certificate.exam.certificateTemplate?.dateBottom || 12.0,
+      dateLeft: certificate.exam.certificateTemplate?.dateLeft || 16.2
+    })
+
+    await dispatchTemplateToMandrill(
+      'CERTIFICATE_SENT',
+      studentEmail,
+      studentName,
+      {
+        NAME: studentName,
+        EXAM_NAME: certificate.exam.title,
+        CERTIFICATE_CODE: certificate.code
+      },
+      'Seu certificado Elite Certify está aqui! 🎓',
+      undefined,
+      {
+        filename: `Certificado-${certificate.code}.pdf`,
+        content: pdfBuffer.toString('base64'),
+        type: 'application/pdf'
+      },
+      certificate.code
+    )
+
+    console.log(`[CertificateService] E-mail enviado: ${certificateCode}`)
+  } catch (error: any) {
+    console.error(`[CertificateService] Erro ao enviar e-mail:`, error.message)
+  }
 }

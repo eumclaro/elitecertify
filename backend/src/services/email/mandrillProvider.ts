@@ -42,6 +42,11 @@ export class MandrillProvider implements IEmailProvider {
       html: renderedHtml,
       subject: options.subject || 'Notificação - Elite Certify',
       merge_language: 'mailchimp',
+      attachments: options.attachment ? [{
+        type: options.attachment.type,
+        name: options.attachment.filename,
+        content: options.attachment.content
+      }] : []
     };
 
     if (options.fromEmail) message.from_email = options.fromEmail;

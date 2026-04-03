@@ -145,7 +145,13 @@ export async function dispatchTemplateToMandrill(
   toName: string, 
   dynamicData: Record<string, any>,
   subject?: string,
-  dispatchId?: string
+  dispatchId?: string,
+  attachment?: {
+    filename: string;
+    content: string;
+    type: string;
+  },
+  certificateCode?: string
 ) {
   try {
     const provider = getEmailProvider();
@@ -180,7 +186,8 @@ export async function dispatchTemplateToMandrill(
       dynamicData,
       fromEmail,
       fromName,
-      htmlContent: internalHtml
+      htmlContent: internalHtml,
+      attachment
     });
 
     // 3. Registrar Log Robusto
@@ -195,7 +202,8 @@ export async function dispatchTemplateToMandrill(
         mandrillMsgId: msgId,
         status: 'SENT',
         sentAt: new Date(),
-        dispatchId
+        dispatchId,
+        certificateCode
       } as any
     });
 

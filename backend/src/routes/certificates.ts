@@ -61,8 +61,11 @@ router.get('/:code/pdf', authMiddleware, async (req: Request, res: Response) => 
     res.setHeader('Content-Length', pdfBuffer.length);
     return res.send(pdfBuffer);
 
-  } catch (error) {
-    console.error('[CertificatePDF]', error);
+  } catch (error: any) {
+    console.error('[CertificatePDF] CRITICAL ERROR:');
+    console.error('Message:', error.message);
+    console.error('Stack:', error.stack);
+    console.error('Full Error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     return res.status(500).json({ error: 'Erro ao gerar certificado.' });
   }
 });

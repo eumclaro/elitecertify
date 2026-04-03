@@ -153,7 +153,9 @@ router.post('/login', async (req: Request, res: Response) => {
       token,
     });
   } catch (error: any) {
-    console.error('Login error:', error);
+    console.error('[CRITICAL] 500 LOGIN FAILURE DETECTED:');
+    console.error('Stack Trace:', error.stack || 'No stack available');
+    console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     return res.status(500).json({ error: 'Erro ao fazer login' });
   }
 });

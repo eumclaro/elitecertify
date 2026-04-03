@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer'
 import path from 'path'
 import fs from 'fs'
+import prisma from '../config/database'
 
 interface CertificateData {
   studentName: string
@@ -90,7 +91,8 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
 
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   })
 
   try {
@@ -109,4 +111,25 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
   } finally {
     await browser.close()
   }
+}
+
+export async function generateCertificateCode(): Promise<string> {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let isUnique = false
+  let code = ''
+
+  while (!isUnique) {
+    code = ''
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    const finalCode = `ELT-${code}`
+    const existing = await prisma.certificate.findUnique({ where: { code: finalCode } })
+    if (!existing) {
+      isUnique = true
+      return finalCode
+    }
+  }
+
+  return `ELT-${code}`
 }

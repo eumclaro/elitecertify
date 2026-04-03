@@ -4,6 +4,7 @@ import { authMiddleware, requireRole } from '../middleware/auth';
 import { checkPermission } from '../middlewares/checkPermission';
 import { getClientInfo } from '../middleware/audit';
 import { sendExamPassedEmail, sendExamFailedEmail, sendExamAbandonedEmail } from '../services/mail';
+import { generateCertificateCode } from '../services/certificateService';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -234,7 +235,7 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
     // Se passou, cria certificado
     let certificate = null;
     if (passed) {
-      const code = `CERT-${Date.now().toString(36).toUpperCase()}-${uuid().substring(0, 8).toUpperCase()}`;
+      const code = await generateCertificateCode();
       certificate = await prisma.certificate.create({
         data: {
           studentId: attempt.studentId,

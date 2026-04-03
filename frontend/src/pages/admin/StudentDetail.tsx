@@ -68,7 +68,8 @@ import {
   Trash2,
   Save,
   Trophy as TrophyIcon,
-  Download as DownloadIcon
+  Download as DownloadIcon,
+  Send
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from 'date-fns';
@@ -131,6 +132,7 @@ export default function StudentDetail() {
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -209,6 +211,32 @@ export default function StudentDetail() {
       toast.error('Erro ao gerar o PDF do certificado');
     } finally {
       setDownloading(null);
+    }
+  };
+
+  const handleResendCertificate = async (code: string) => {
+    setSendingEmail(code);
+    try {
+      const token = localStorage.getItem('elt-cert-token');
+      const response = await fetch(`/api/certificates/${code}/send-email`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Erro ao reenviar certificado');
+      }
+
+      toast.success('Certificado reenviado por e-mail com sucesso!');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Erro ao reenviar certificado por e-mail');
+    } finally {
+      setSendingEmail(null);
     }
   };
 
@@ -675,20 +703,36 @@ export default function StudentDetail() {
                             {format(new Date(cert.issuedAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="gap-2 h-8 font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                              onClick={() => handleDownloadCertificate(cert.code)}
-                              disabled={downloading === cert.code}
-                            >
-                              {downloading === cert.code ? (
-                                <Loader2 className="size-3 animate-spin" />
-                              ) : (
-                                <DownloadIcon className="size-3" />
-                              )}
-                              Baixar PDF
-                            </Button>
+                            <div className="flex items-center justify-end gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="gap-2 h-8 font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                                onClick={() => handleDownloadCertificate(cert.code)}
+                                disabled={downloading === cert.code}
+                              >
+                                {downloading === cert.code ? (
+                                  <Loader2 className="size-3 animate-spin" />
+                                ) : (
+                                  <DownloadIcon className="size-3" />
+                                )}
+                                Baixar PDF
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="gap-2 h-8 font-bold border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                                onClick={() => handleResendCertificate(cert.code)}
+                                disabled={sendingEmail === cert.code}
+                              >
+                                {sendingEmail === cert.code ? (
+                                  <Loader2 className="size-3 animate-spin" />
+                                ) : (
+                                  <Send className="size-3" />
+                                )}
+                                Reenviar Certificado
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}

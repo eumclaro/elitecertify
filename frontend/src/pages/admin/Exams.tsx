@@ -71,6 +71,7 @@ interface Exam {
   questionOrder: 'FIXED' | 'RANDOM';
   status: string;
   certificateTemplateId: string | null;
+  webhookUrl: string | null;
   releases: ExamRelease[];
   _count: { questions: number; attempts: number; releases: number };
   createdAt: string;
@@ -94,6 +95,7 @@ export default function Exams() {
     questionCount: 10, durationMinutes: 60, passingScore: 70,
     maxAttempts: 0, cooldownDays: 0, questionOrder: 'FIXED' as 'FIXED' | 'RANDOM',
     certificateTemplateId: null as string | null,
+    webhookUrl: '',
   });
 
   const loadData = async () => {
@@ -127,6 +129,7 @@ export default function Exams() {
       questionCount: 10, durationMinutes: 60, passingScore: 70,
       maxAttempts: 0, cooldownDays: 0, questionOrder: 'FIXED',
       certificateTemplateId: null,
+      webhookUrl: '',
     });
     setShowModal(true);
   };
@@ -143,6 +146,7 @@ export default function Exams() {
       cooldownDays: exam.cooldownDays,
       questionOrder: exam.questionOrder as 'FIXED' | 'RANDOM',
       certificateTemplateId: exam.certificateTemplateId,
+      webhookUrl: exam.webhookUrl || '',
     });
     setShowModal(true);
   };
@@ -425,6 +429,21 @@ export default function Exams() {
                       ))}
                     </SelectContent>
                  </Select>
+              </div>
+
+              <div className="col-span-2 space-y-2 pt-2">
+                 <Label className="flex items-center gap-2">
+                   URL do Webhook
+                   <Badge variant="outline" className="font-normal text-[10px]">Opcional</Badge>
+                 </Label>
+                 <Input
+                   type="text"
+                   value={form.webhookUrl}
+                   onChange={e => setForm({...form, webhookUrl: e.target.value})}
+                   placeholder="https://exemplo.com/webhook"
+                   className="bg-muted/30 font-mono text-xs"
+                 />
+                 <p className="text-[10px] text-muted-foreground">Receba notificações de eventos da prova via webhook</p>
               </div>
             </div>
 

@@ -85,7 +85,6 @@ export default function ExamQuestions() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
-  const [importSuccessMsg, setImportSuccessMsg] = useState('');
 
   const [formText, setFormText] = useState('');
   const [formType, setFormType] = useState('SINGLE_CHOICE');

@@ -127,6 +127,18 @@ export default function TakeExam() {
     setTimeLeft(remaining);
   }, [examData, navigate]);
 
+  const executeSubmit = useCallback(async () => {
+    setConfirmSubmit(null);
+    setSubmitting(true);
+    try {
+      const { data } = await api.post(`/exam-engine/submit/${examData.attempt.id}`);
+      navigate(`/student/result/${examData.attempt.id}`, { state: data });
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao submeter prova');
+      setSubmitting(false);
+    }
+  }, [examData, navigate]);
+
   // Timer countdown
   useEffect(() => {
     if (timeLeft <= 0) return;
@@ -207,18 +219,6 @@ export default function TakeExam() {
       return;
     }
     executeSubmit();
-  };
-
-  const executeSubmit = async () => {
-    setConfirmSubmit(null);
-    setSubmitting(true);
-    try {
-      const { data } = await api.post(`/exam-engine/submit/${examData.attempt.id}`);
-      navigate(`/student/result/${examData.attempt.id}`, { state: data });
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao submeter prova');
-      setSubmitting(false);
-    }
   };
 
   if (!examData) {

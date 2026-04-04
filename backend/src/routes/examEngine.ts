@@ -145,7 +145,7 @@ router.post('/start/:examId', authMiddleware, async (req: Request, res: Response
 // ============================================================
 router.post('/answer', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { attemptId, questionId, alternativeId } = req.body;
+    const { attemptId, questionId, alternativeId, textAnswer } = req.body;
 
     const attempt = await prisma.examAttempt.findUnique({ where: { id: attemptId as string } });
     if (!attempt || attempt.executionStatus !== 'IN_PROGRESS') {
@@ -179,6 +179,9 @@ router.post('/answer', authMiddleware, async (req: Request, res: Response) => {
       }
     }
 
+    const question = await prisma.question.findUnique({ where: { id: questionId as string } });
+    const isEssay = question?.type === 'ESSAY';
+
     const existing = await prisma.answer.findFirst({
       where: { attemptId: attemptId as string, questionId: questionId as string },
     });
@@ -187,14 +190,24 @@ router.post('/answer', authMiddleware, async (req: Request, res: Response) => {
       ? await prisma.alternative.findUnique({ where: { id: alternativeId as string } })
       : null;
 
+    const dataToSave = {
+      alternativeId: alternativeId as string || null,
+      textAnswer: textAnswer as string || null,
+      isCorrect: isEssay ? null : (alternative?.isCorrect || false)
+    };
+
     if (existing) {
       await prisma.answer.update({
         where: { id: existing.id as string },
-        data: { alternativeId: alternativeId as string, isCorrect: alternative?.isCorrect || false },
+        data: dataToSave,
       });
     } else {
       await prisma.answer.create({
-        data: { attemptId: attemptId as string, questionId: questionId as string, alternativeId: alternativeId as string, isCorrect: alternative?.isCorrect || false },
+        data: { 
+          attemptId: attemptId as string, 
+          questionId: questionId as string, 
+          ...dataToSave 
+        },
       });
     }
 

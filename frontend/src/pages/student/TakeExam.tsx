@@ -116,6 +116,7 @@ export default function TakeExam() {
     const existing: Record<string, string> = {};
     examData.existingAnswers?.forEach((a: any) => {
       if (a.alternativeId) existing[a.questionId] = a.alternativeId;
+      else if (a.textAnswer) existing[a.questionId] = a.textAnswer;
     });
     setAnswers(existing);
 
@@ -146,19 +147,41 @@ export default function TakeExam() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const selectAnswer = useCallback(async (questionId: string, alternativeId: string) => {
-    setAnswers(prev => ({ ...prev, [questionId]: alternativeId }));
+  const debouncedSave = useRef<Record<string, any>>({});
 
-    try {
-      await api.post('/exam-engine/answer', {
-        attemptId: examData.attempt.id,
-        questionId,
-        alternativeId,
-      });
-    } catch (err: any) {
-      if (err.response?.data?.expired) {
-        alert('Tempo esgotado!');
-        navigate('/student/exams');
+  const saveAnswer = useCallback(async (questionId: string, value: string, isEssay = false) => {
+    setAnswers(prev => ({ ...prev, [questionId]: value }));
+
+    if (isEssay) {
+      if (debouncedSave.current[questionId]) {
+        clearTimeout(debouncedSave.current[questionId]);
+      }
+      debouncedSave.current[questionId] = setTimeout(async () => {
+        try {
+          await api.post('/exam-engine/answer', {
+            attemptId: examData.attempt.id,
+            questionId,
+            textAnswer: value,
+          });
+        } catch (err: any) {
+          if (err.response?.data?.expired) {
+             alert('Tempo esgotado!');
+             navigate('/student/exams');
+          }
+        }
+      }, 1000);
+    } else {
+      try {
+        await api.post('/exam-engine/answer', {
+          attemptId: examData.attempt.id,
+          questionId,
+          alternativeId: value,
+        });
+      } catch (err: any) {
+        if (err.response?.data?.expired) {
+          alert('Tempo esgotado!');
+          navigate('/student/exams');
+        }
       }
     }
   }, [examData, navigate]);
@@ -284,34 +307,48 @@ export default function TakeExam() {
                 <p className="mt-2 text-base leading-relaxed font-medium">{question.text}</p>
               </div>
 
-              <div className="space-y-2">
-                {question.alternatives.map((alt: any, idx: number) => {
-                  const letter = String.fromCharCode(65 + idx);
-                  const isSelected = answers[question.id] === alt.id;
-                  return (
-                    <button
-                      key={alt.id}
-                      onClick={() => selectAnswer(question.id, alt.id)}
-                      className={cn(
-                        'w-full flex items-start gap-3 rounded-lg border p-4 text-left text-sm transition-all',
-                        isSelected
-                          ? 'bg-primary/10 border-primary text-foreground font-medium'
-                          : 'bg-background border-border hover:bg-muted/60 text-foreground'
-                      )}
-                    >
-                      <span className={cn(
-                        'flex-shrink-0 size-6 rounded-full flex items-center justify-center text-xs font-bold border',
-                        isSelected
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-muted text-muted-foreground border-border'
-                      )}>
-                        {letter}
-                      </span>
-                      <span className="leading-snug pt-0.5">{alt.text}</span>
-                    </button>
-                  );
-                })}
-              </div>
+                {question.type === 'ESSAY' ? (
+                  <div className="space-y-4">
+                    <textarea
+                      className="w-full min-h-[200px] p-4 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm leading-relaxed"
+                      placeholder="Digite sua resposta aqui..."
+                      value={answers[question.id] || ''}
+                      onChange={(e) => saveAnswer(question.id, e.target.value, true)}
+                    />
+                    <p className="text-[10px] text-muted-foreground text-right italic">
+                      As alterações são salvas automaticamente enquanto você digita.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {question.alternatives.map((alt: any, idx: number) => {
+                      const letter = String.fromCharCode(65 + idx);
+                      const isSelected = answers[question.id] === alt.id;
+                      return (
+                        <button
+                          key={alt.id}
+                          onClick={() => saveAnswer(question.id, alt.id)}
+                          className={cn(
+                            'w-full flex items-start gap-3 rounded-lg border p-4 text-left text-sm transition-all',
+                            isSelected
+                              ? 'bg-primary/10 border-primary text-foreground font-medium'
+                              : 'bg-background border-border hover:bg-muted/60 text-foreground'
+                          )}
+                        >
+                          <span className={cn(
+                            'flex-shrink-0 size-6 rounded-full flex items-center justify-center text-xs font-bold border',
+                            isSelected
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-muted text-muted-foreground border-border'
+                          )}>
+                            {letter}
+                          </span>
+                          <span className="leading-snug pt-0.5">{alt.text}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
             </CardContent>
           </Card>
         </div>

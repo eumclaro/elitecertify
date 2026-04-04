@@ -467,7 +467,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         orderBy: { startedAt: 'desc' }
       }),
       prisma.emailLog.findMany({
-        where: { recipient: studentInfo.user.email },
+        where: { studentId },
         orderBy: { createdAt: 'desc' },
         take: 50
       }),
@@ -534,17 +534,20 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         if (a.resultStatus === 'PASSED') {
           statusTitle = `Aprovado na prova ${a.exam?.title || 'Prova'}`;
           color = 'bg-emerald-600';
-        } else if (a.resultStatus === 'FAILED') {
+        } else if (a.resultStatus === 'FAILED' || a.resultStatus === 'FAILED_TIMEOUT') {
           statusTitle = `Reprovado na prova ${a.exam?.title || 'Prova'}`;
           color = 'bg-rose-600';
         }
 
         if (statusTitle) {
+          const isTimeout = a.resultStatus === 'FAILED_TIMEOUT';
           timeline.push({
             type: 'EXAM_RESULT',
             date: a.finishedAt,
             title: statusTitle,
-            description: `Resultado concluído com nota de ${a.score}%.`,
+            description: isTimeout 
+              ? `Resultado concluído com nota de ${a.score}%. Motivo: tempo excedido.`
+              : `Resultado concluído com nota de ${a.score}%.`,
             color: color
           });
         }
@@ -583,21 +586,30 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
       }
     });
 
-    // 5. Emails
+    const eventLabels: Record<string, string> = {
+      'EXAM_PASSED': 'Aprovado na prova',
+      'EXAM_FAILED': 'Reprovado na prova',
+      'EXAM_ABANDONED': 'Prova abandonada',
+      'EXAM_STARTED': 'Iniciou a prova',
+      'CERTIFICATE_SENT': 'Certificado enviado',
+      'CERTIFICATE_AVAILABLE': 'Certificado enviado',
+      'COOLDOWN_RELEASED': 'Cooldown liberado',
+      'COOLDOWN_APPLIED': 'Cooldown aplicado',
+      'STUDENT_CREATED': 'Boas-vindas enviado',
+      'PASSWORD_RESET': 'Redefinição de senha',
+    };
+
     (emails as any[]).forEach((e: any) => {
       let iconColor = 'bg-indigo-600';
-      let title = `E-mail enviado: ${e.eventKey}`;
+      const title = eventLabels[e.eventKey] || 'E-mail enviado';
       
-      if (e.eventKey === 'EXAM_PASSED') {
-        title = 'E-mail de Aprovação enviado';
-        iconColor = 'bg-emerald-500';
-      } else if (e.eventKey === 'EXAM_FAILED') {
-        title = 'E-mail de Reprovação enviado';
-        iconColor = 'bg-rose-500';
-      } else if (e.eventKey === 'CERTIFICATE_SENT' || e.eventKey === 'CERTIFICATE_AVAILABLE') {
-        title = 'E-mail com Certificado enviado';
-        iconColor = 'bg-blue-500';
-      }
+      if (e.eventKey === 'EXAM_PASSED') iconColor = 'bg-emerald-500';
+      else if (e.eventKey === 'EXAM_FAILED') iconColor = 'bg-rose-500';
+      else if (e.eventKey === 'CERTIFICATE_SENT' || e.eventKey === 'CERTIFICATE_AVAILABLE') iconColor = 'bg-blue-500';
+      else if (e.eventKey === 'EXAM_ABANDONED') iconColor = 'bg-slate-600';
+      else if (e.eventKey === 'EXAM_STARTED') iconColor = 'bg-amber-600';
+      else if (e.eventKey === 'COOLDOWN_RELEASED') iconColor = 'bg-blue-600';
+      else if (e.eventKey === 'COOLDOWN_APPLIED') iconColor = 'bg-amber-600';
 
       timeline.push({
         type: 'EMAIL_SENT',
@@ -774,3 +786,5 @@ router.delete('/:id/unenroll/:classId', authMiddleware, requireRole('ADMIN'), ch
 
 export default router;
 
+/ /   c a c h e - b u s t   2 0 2 6 - 0 4 - 0 4   0 9 : 0 7  
+ 

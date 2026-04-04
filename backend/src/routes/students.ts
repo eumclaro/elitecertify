@@ -294,11 +294,15 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdi
     }
 
     // Update student fields
+    // Sanitize: empty strings -> null (CPF has @unique, empty string causes P2002)
+    const cleanCpf = cpf !== undefined ? (cpf?.trim() || null) : undefined;
+    const cleanPhone = phone !== undefined ? (phone?.trim() || null) : undefined;
+
     const updated = await prisma.student.update({
       where: { id: req.params.id as string },
       data: {
-        ...(cpf !== undefined && { cpf }),
-        ...(phone !== undefined && { phone }),
+        ...(cleanCpf !== undefined && { cpf: cleanCpf }),
+        ...(cleanPhone !== undefined && { phone: cleanPhone }),
         ...(lastName !== undefined && { lastName }),
         ...(status && { status }),
       },

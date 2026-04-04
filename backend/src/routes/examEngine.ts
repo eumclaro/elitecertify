@@ -21,7 +21,7 @@ router.post('/start/:examId', authMiddleware, async (req: Request, res: Response
 
     const student = await prisma.student.findUnique({
       where: { userId },
-      include: { classes: true }
+      include: { classes: true, user: true }
     });
     if (!student) return res.status(403).json({ error: 'Apenas alunos podem iniciar provas' });
 
@@ -97,6 +97,28 @@ router.post('/start/:examId', authMiddleware, async (req: Request, res: Response
     await prisma.auditEvent.create({
       data: { userId, action: 'EXAM_START', entity: 'ExamAttempt', entityId: attempt.id, ip, device },
     });
+
+    // Webhook: exam.started
+    triggerExamWebhook(examId as string, {
+      event: 'exam.started',
+      timestamp: new Date().toISOString(),
+      student: {
+        id: student.id,
+        name: `${student.user.name} ${student.lastName || ''}`.trim(),
+        email: student.user.email,
+      },
+      exam: {
+        id: exam.id,
+        title: exam.title,
+      },
+      attempt: {
+        id: attempt.id,
+        score: 0,
+        passed: false,
+        totalQuestions: exam.questionCount,
+        correctAnswers: 0,
+      },
+    }).catch(err => console.error('[Webhook] Start Trigger Error:', err));
 
     const questions = ex.questionOrder === 'RANDOM'
       ? ex.questions.sort(() => Math.random() - 0.5)

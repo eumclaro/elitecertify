@@ -35,6 +35,7 @@ export default function TakeExam() {
 
   const submittingRef = useRef(false);
   const abandonedRef = useRef(false);
+  const alerted33Ref = useRef(false);
 
   useEffect(() => { submittingRef.current = submitting; }, [submitting]);
 
@@ -129,17 +130,29 @@ export default function TakeExam() {
   // Timer countdown
   useEffect(() => {
     if (timeLeft <= 0) return;
+
+    // Alerta de 33%
+    const totalSeconds = (examData?.exam?.durationMinutes || 0) * 60;
+    if (totalSeconds > 0 && !alerted33Ref.current) {
+      const pct = (timeLeft / totalSeconds) * 100;
+      if (pct <= 33) {
+        alerted33Ref.current = true;
+        const minsRemaining = Math.ceil(timeLeft / 60);
+        alert(`⚠️ Atenção: Menos de ${minsRemaining} minutos restantes!`);
+      }
+    }
+
     const interval = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          handleSubmit();
+          executeSubmit(); // <--- Força o envio direto sem modal
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [timeLeft]);
+  }, [timeLeft, examData, executeSubmit]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -252,9 +265,12 @@ export default function TakeExam() {
 
           <div className={cn(
             'flex items-center gap-2 font-mono font-bold text-lg tabular-nums px-3 py-1 rounded-lg border',
-            isUrgent
-              ? 'text-red-600 bg-red-50 border-red-200 animate-pulse'
-              : 'text-foreground bg-muted border-border'
+            isUrgent ? 'animate-pulse' : '',
+            progressPct > 66 
+              ? 'text-emerald-600 bg-emerald-50 border-emerald-200' 
+              : progressPct > 33 
+                ? 'text-orange-500 bg-orange-50 border-orange-200' 
+                : 'text-rose-600 bg-rose-50 border-rose-200'
           )}>
             ⏱ {formatTime(timeLeft)}
           </div>

@@ -156,24 +156,54 @@ router.post('/answer', authMiddleware, async (req: Request, res: Response) => {
     if (exam) {
       const elapsed = (Date.now() - attempt.startedAt.getTime()) / 60000;
       if (elapsed > exam.durationMinutes) {
-        // Auto-abandon timeout
+        // Auto-abandon timeout (Closed because time exceeded)
         await prisma.examAttempt.update({
           where: { id: attemptId as string },
           data: { executionStatus: 'EXPIRED', resultStatus: 'FAILED_TIMEOUT', finishedAt: new Date(), score: 0 },
         });
         
+        let endsAt: Date | null = null;
         if (exam.cooldownDays > 0) {
-          const endsAt = new Date(Date.now() + exam.cooldownDays * 24 * 60 * 60 * 1000);
+          endsAt = new Date(Date.now() + exam.cooldownDays * 24 * 60 * 60 * 1000);
           await prisma.cooldown.create({
             data: { studentId: attempt.studentId, examId: attempt.examId, endsAt, status: 'ACTIVE' },
           });
         }
 
-        prisma.student.findUnique({ where: { id: attempt.studentId }, include: { user: true } })
-          .then(s => {
-            if (s) sendExamAbandonedEmail(s.user.name, s.user.email, exam.title, s.lastName || '')
-              .catch(err => console.error('[MAIL] Abandoned-Timeout Error:', err));
-          });
+        // DISPARO DE E-MAIL E WEBHOOK
+        const student = await prisma.student.findUnique({ where: { id: attempt.studentId }, include: { user: true } });
+        if (student) {
+          // Webhook
+          triggerExamWebhook(attempt.examId, {
+            event: 'exam.failed',
+            timestamp: new Date().toISOString(),
+            student: { id: student.id, name: `${student.user.name} ${student.lastName || ''}`.trim(), email: student.user.email },
+            exam: { id: exam.id, title: exam.title },
+            attempt: { 
+              id: attempt.id, 
+              score: 0, 
+              passed: false,
+              totalQuestions: exam.questionCount,
+              correctAnswers: 0,
+              status: 'FAILED_TIMEOUT', 
+              reason: 'timeout' 
+            }
+          }).catch(err => console.error('[WEBHOOK] Timeout error:', err));
+
+          // E-mail de Reprovação (Timeout)
+          sendExamFailedEmail(
+            student.user.name,
+            student.user.email,
+            exam.title,
+            0,
+            0,
+            exam.questionCount,
+            endsAt || undefined,
+            student.lastName || '',
+            attempt.id,
+            student.id
+          ).catch(err => console.error('[MAIL] Timeout-Email Error:', err));
+        }
 
         return res.status(400).json({ error: 'Tempo esgotado. Prova encerrada.', expired: true });
       }
@@ -307,7 +337,8 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
         totalQuestions,
         // futuramente gerar URL de print do certificado
         undefined,
-        att.student.lastName || ''
+        att.student.lastName || '',
+        att.student.id
       ).catch((err) => console.error('[MAIL] Pass-Mail Error:', err));
     } else {
       sendExamFailedEmail(
@@ -319,7 +350,8 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
         totalQuestions,
         endsAt || undefined,
         att.student.lastName || '',
-        attempt.id
+        attempt.id,
+        att.student.id
       ).catch((err) => console.error('[MAIL] Fail-Mail Error:', err));
     }
 

@@ -20,6 +20,8 @@ interface WebhookPayload {
     passed: boolean;
     totalQuestions: number;
     correctAnswers: number;
+    status?: string;
+    reason?: string;
   };
   certificate?: {
     code: string;

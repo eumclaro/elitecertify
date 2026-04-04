@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { checkPermission } from '../middlewares/checkPermission';
+import { getClientInfo } from '../middleware/audit';
 
 const router = Router();
 
@@ -231,6 +232,14 @@ router.put('/:id/students', authMiddleware, requireRole('ADMIN'), checkPermissio
           studentId
         }))
       });
+
+      // Audit for each student's timeline
+      const { ip, device } = getClientInfo(req);
+      for (const studentId of studentIds) {
+        await prisma.auditEvent.create({
+          data: { userId: (req as any).user.userId, action: 'STUDENT_CLASSES_UPDATED', entity: 'student', entityId: studentId, ip, device }
+        }).catch(() => {}); // Non-blocking audit
+      }
     }
 
     return res.json({ message: 'Alunos vinculados com sucesso' });

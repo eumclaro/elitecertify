@@ -4,6 +4,7 @@ import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { checkPermission } from '../middlewares/checkPermission';
 import { sendWelcomeEmail } from '../services/mail';
+import { getClientInfo } from '../middleware/audit';
 
 const router = Router();
 
@@ -285,12 +286,38 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdi
       if (active !== undefined) userData.active = active;
       if (password) {
         userData.passwordHash = await bcrypt.hash(password, 12);
+        
+        const { ip, device } = getClientInfo(req);
+        await prisma.auditEvent.create({
+          data: { userId: (req as any).user.userId, action: 'STUDENT_PASSWORD_RESET_BY_ADMIN', entity: 'student', entityId: student.id, ip, device }
+        });
       }
 
       await prisma.user.update({
         where: { id: student.userId as string },
         data: userData,
       });
+
+      if (active !== undefined) {
+        const { ip, device } = getClientInfo(req);
+        await prisma.auditEvent.create({
+          data: { 
+            userId: (req as any).user.userId, 
+            action: active ? 'STUDENT_ACCOUNT_ACTIVATED' : 'STUDENT_ACCOUNT_DEACTIVATED', 
+            entity: 'student', 
+            entityId: student.id, 
+            ip, 
+            device 
+          }
+        });
+      }
+
+      if (name || email) {
+        const { ip, device } = getClientInfo(req);
+        await prisma.auditEvent.create({
+          data: { userId: (req as any).user.userId, action: 'STUDENT_PROFILE_EDITED', entity: 'student', entityId: student.id, ip, device }
+        });
+      }
     }
 
     // Update student fields
@@ -320,6 +347,11 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdi
           data: classIds.map((classId: string) => ({ classId, studentId: req.params.id as string })),
         });
       }
+
+      const { ip, device } = getClientInfo(req);
+      await prisma.auditEvent.create({
+        data: { userId: (req as any).user.userId, action: 'STUDENT_CLASSES_UPDATED', entity: 'student', entityId: student.id, ip, device }
+      });
     }
 
     return res.json(updated);
@@ -336,6 +368,11 @@ router.delete('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('can
     if (!student) {
       return res.status(404).json({ error: 'Aluno não encontrado' });
     }
+
+    const { ip, device } = getClientInfo(req);
+    await prisma.auditEvent.create({
+      data: { userId: (req as any).user.userId, action: 'STUDENT_DELETED', entity: 'student', entityId: student.id, ip, device }
+    });
 
     // Delete user (cascades to student)
     await prisma.user.delete({ where: { id: student.userId as string } });
@@ -380,6 +417,11 @@ router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), checkPer
       data: { passwordHash }
     });
 
+    const { ip, device } = getClientInfo(req);
+    await prisma.auditEvent.create({
+      data: { userId: (req as any).user.userId, action: 'STUDENT_PASSWORD_RESET_BY_ADMIN', entity: 'student', entityId: student.id, ip, device }
+    });
+
     // Disparo aguardado para o aluno
     const s = student as any;
     try {
@@ -413,7 +455,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
     if (!studentInfo) return res.status(404).json({ error: 'Aluno não encontrado' });
 
     // Fetch all relevant entities in parallel
-    const [attempts, cooldowns, emails, referrals, interests] = await Promise.all([
+    const [attempts, cooldowns, emails, referrals, interests, logins, audits] = await Promise.all([
       prisma.examAttempt.findMany({
         where: { studentId },
         include: { exam: { select: { title: true } } },
@@ -438,6 +480,15 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         where: { studentId },
         include: { event: { select: { title: true } } },
         orderBy: { createdAt: 'desc' }
+      }),
+      prisma.studentLoginLog.findMany({
+        where: { studentId },
+        orderBy: { createdAt: 'desc' },
+        take: 30
+      }),
+      prisma.auditEvent.findMany({
+        where: { entity: 'student', entityId: studentId },
+        orderBy: { createdAt: 'desc' }
       })
     ]);
 
@@ -457,7 +508,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
       studentInfo.classes.forEach((c: any) => {
         timeline.push({
           type: 'ENROLLMENT',
-          date: c.joinedAt, // Corrected to use the specific enrollment date
+          date: c.joinedAt,
           title: `Matriculado na turma ${c.class.name}`,
           description: `Ingresso na turma para realização de provas e certificações.`,
           color: 'bg-blue-500'
@@ -521,10 +572,10 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         color: 'bg-amber-600'
       });
 
-      if (c.status === 'CLEARED') {
+      if (c.status === 'CLEARED' && c.clearedAt) {
         timeline.push({
           type: 'COOLDOWN_RELEASED',
-          date: c.endsAt, 
+          date: c.clearedAt, 
           title: 'Cooldown liberado manualmente',
           description: `O bloqueio da prova ${c.exam?.title || 'Prova'} foi removido por um administrador.`,
           color: 'bg-blue-600'
@@ -534,12 +585,26 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
 
     // 5. Emails
     (emails as any[]).forEach((e: any) => {
+      let iconColor = 'bg-indigo-600';
+      let title = `E-mail enviado: ${e.eventKey}`;
+      
+      if (e.eventKey === 'EXAM_PASSED') {
+        title = 'E-mail de Aprovação enviado';
+        iconColor = 'bg-emerald-500';
+      } else if (e.eventKey === 'EXAM_FAILED') {
+        title = 'E-mail de Reprovação enviado';
+        iconColor = 'bg-rose-500';
+      } else if (e.eventKey === 'CERTIFICATE_SENT' || e.eventKey === 'CERTIFICATE_AVAILABLE') {
+        title = 'E-mail com Certificado enviado';
+        iconColor = 'bg-blue-500';
+      }
+
       timeline.push({
         type: 'EMAIL_SENT',
         date: e.createdAt,
-        title: `E-mail enviado: ${e.eventKey}`,
-        description: `Comunicação disparada via provedor ${e.provider}.`,
-        color: 'bg-indigo-600'
+        title,
+        description: `Comunicação enviada para ${e.recipient}. Status: ${e.status}`,
+        color: iconColor
       });
     });
 
@@ -562,6 +627,49 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         title: `Interesse no evento ${i.event?.title || 'Evento'}`,
         description: `Demonstrou interesse em participar e receber mais informações.`,
         color: 'bg-sky-600'
+      });
+    });
+
+    // 8. Logins
+    (logins as any[]).forEach((l: any) => {
+      timeline.push({
+        type: 'LOGIN',
+        date: l.createdAt,
+        title: 'Acesso à plataforma',
+        description: `Login realizado. IP: ${l.ip || 'desconhecido'}.`,
+        color: 'bg-zinc-800'
+      });
+    });
+
+    // 9. Admin Actions (Audits)
+    (audits as any[]).forEach((audit: any) => {
+      let title = 'Ação administrativa';
+      let color = 'bg-gray-700';
+      let description = `Ação realizada por administrador. IP: ${audit.ip || 'desconhecido'}`;
+
+      if (audit.action === 'STUDENT_PROFILE_EDITED') {
+        title = 'Perfil editado pelo admin';
+        color = 'bg-gray-600';
+      } else if (audit.action === 'STUDENT_PASSWORD_RESET_BY_ADMIN') {
+        title = 'Senha resetada pelo admin';
+        color = 'bg-orange-700';
+      } else if (audit.action === 'STUDENT_ACCOUNT_DEACTIVATED') {
+        title = 'Conta desativada pelo admin';
+        color = 'bg-red-900';
+      } else if (audit.action === 'STUDENT_ACCOUNT_ACTIVATED') {
+        title = 'Conta reativada pelo admin';
+        color = 'bg-green-900';
+      } else if (audit.action === 'STUDENT_CLASSES_UPDATED') {
+        title = 'Turmas/Vínculos alterados';
+        color = 'bg-cyan-700';
+      }
+
+      timeline.push({
+        type: 'ADMIN_ACTION',
+        date: audit.createdAt,
+        title,
+        description,
+        color
       });
     });
 

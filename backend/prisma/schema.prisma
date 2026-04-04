@@ -52,6 +52,7 @@ model Student {
   npsResponses   NpsResponse[]
   eventInterests EventInterest[]
   eventReferrals EventReferral[]
+  loginLogs      StudentLoginLog[]
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("students")
@@ -196,11 +197,24 @@ model Cooldown {
   examId    String         @map("exam_id")
   startedAt DateTime       @default(now()) @map("started_at")
   endsAt    DateTime       @map("ends_at")
+  clearedAt DateTime?      @map("cleared_at")
   status    CooldownStatus @default(ACTIVE)
   exam      Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
   student   Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@map("cooldowns")
+}
+
+model StudentLoginLog {
+  id        String   @id @default(uuid())
+  studentId String   @map("student_id")
+  ip        String?
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@map("student_login_logs")
 }
 
 model Certificate {

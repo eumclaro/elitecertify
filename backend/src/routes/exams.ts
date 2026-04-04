@@ -332,7 +332,7 @@ router.put('/cooldowns/:id/clear', authMiddleware, requireRole('ADMIN'), checkPe
     // Set to CLEARED
     const updated = await prisma.cooldown.update({
       where: { id: id as string },
-      data: { status: 'CLEARED' },
+      data: { status: 'CLEARED', clearedAt: new Date() },
       include: { exam: { select: { title: true } }, student: { include: { user: true } } }
     });
 

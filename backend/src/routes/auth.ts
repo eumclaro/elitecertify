@@ -141,6 +141,17 @@ router.post('/login', async (req: Request, res: Response) => {
       },
     });
 
+    // Register student login log for timeline
+    if (user.student) {
+      await prisma.studentLoginLog.create({
+        data: {
+          studentId: user.student.id,
+          ip,
+          userAgent: device,
+        }
+      }).catch(() => {}); // Non-blocking
+    }
+
     return res.json({
       user: {
         id: user.id,

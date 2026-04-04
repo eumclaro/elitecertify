@@ -128,7 +128,7 @@ router.post('/:code/send-email', authMiddleware, requireRole('ADMIN'), async (re
     const studentName = `${certificate.student.user.name} ${certificate.student.lastName ?? ''}`.trim();
     const studentEmail = certificate.student.user.email;
 
-    await sendCertificateByEmail(code, studentEmail, studentName);
+    await sendCertificateByEmail(code, studentEmail, studentName, 'manual');
 
     return res.json({ message: 'Certificado reenviado por e-mail com sucesso.' });
   } catch (error: any) {

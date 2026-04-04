@@ -142,12 +142,25 @@ export async function generateCertificateCode(): Promise<string> {
 
 /**
  * Envia o certificado em PDF por e-mail para o aluno
+ * @param source - 'auto' (pós-aprovação) ou 'manual' (reenvio pelo admin)
  */
 export async function sendCertificateByEmail(
   certificateCode: string,
   studentEmail: string,
-  studentName: string
+  studentName: string,
+  source: 'auto' | 'manual' = 'auto'
 ): Promise<void> {
+  // Criar registro de Dispatch ANTES do envio para rastreabilidade
+  const dispatch = await prisma.dispatch.create({
+    data: {
+      templateSlug: 'certificate-sent',
+      recipientGroup: source === 'auto' ? 'certificado-auto' : 'certificado-manual',
+      totalSent: 0,
+      totalFailed: 0,
+      failedEmails: [] as any
+    }
+  })
+
   try {
     const certificate = await prisma.certificate.findUnique({
       where: { code: certificateCode },
@@ -184,7 +197,7 @@ export async function sendCertificateByEmail(
         CERTIFICATE_CODE: certificate.code
       },
       'Seu certificado Elite Certify está aqui! 🎓',
-      undefined,
+      dispatch.id,
       {
         filename: `Certificado-${certificate.code}.pdf`,
         content: pdfBuffer.toString('base64'),
@@ -193,8 +206,20 @@ export async function sendCertificateByEmail(
       certificate.code
     )
 
-    console.log(`[CertificateService] E-mail enviado: ${certificateCode}`)
+    // Atualizar dispatch com sucesso
+    await prisma.dispatch.update({
+      where: { id: dispatch.id },
+      data: { totalSent: 1, totalFailed: 0 }
+    })
+
+    console.log(`[CertificateService] E-mail enviado: ${certificateCode} (${source})`)
   } catch (error: any) {
+    // Atualizar dispatch com falha
+    await prisma.dispatch.update({
+      where: { id: dispatch.id },
+      data: { totalSent: 0, totalFailed: 1, failedEmails: [{ email: studentEmail, error: error.message }] as any }
+    }).catch(() => {})
+
     console.error(`[CertificateService] Erro ao enviar e-mail:`, error.message)
   }
 }

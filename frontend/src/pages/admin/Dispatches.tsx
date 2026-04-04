@@ -455,7 +455,15 @@ export default function Dispatches() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <Badge variant="outline" className="w-fit">{d.recipientGroup === 'turma' ? 'Turma' : d.recipientGroup === 'manual' ? 'Manual' : 'Importação'}</Badge>
+                          <Badge variant="outline" className={`w-fit ${
+                            d.recipientGroup === 'certificado-auto' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                            d.recipientGroup === 'certificado-manual' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : ''
+                          }`}>
+                            {d.recipientGroup === 'turma' ? 'Turma' : 
+                             d.recipientGroup === 'certificado-auto' ? 'Automático' :
+                             d.recipientGroup === 'certificado-manual' ? 'Manual (Admin)' :
+                             d.recipientGroup === 'manual' ? 'Manual' : 'Importação'}
+                          </Badge>
                           <span className="text-xs text-muted-foreground">{d.successCount} enviados / {d.totalCount} total</span>
                         </div>
                       </TableCell>

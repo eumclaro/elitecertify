@@ -16,4 +16,5 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
   { slug: 'new-class', name: 'Nova Turma', description: 'Notifica entrada em uma nova turma', eventSlug: 'EXAM_RELEASED' },
   { slug: 'retake-reminder', name: 'Lembrete de Refação', description: 'Lembrete para provas pendentes', eventSlug: 'EXAM_DEADLINE_REMINDER' },
   { slug: 'congratulations', name: 'Parabéns!', description: 'Enviado após aprovação com certificado', eventSlug: 'CERTIFICATE_AVAILABLE' },
+  { slug: 'certificate-sent', name: 'Envio de Certificado', description: 'Certificado PDF anexo enviado ao aluno', eventSlug: 'CERTIFICATE_SENT' },
 ];

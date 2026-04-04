@@ -77,6 +77,13 @@ export const MANDRILL_TEMPLATES: Record<string, EmailTemplateConfig> = {
     description: 'Parabéns pela aprovação e certificado',
     mergeVars: ['NAME', 'EXAM_NAME', 'CERTIFICATE_LINK'],
     eventSlug: 'CERTIFICATE_AVAILABLE'
+  },
+  'certificate-sent': {
+    slug: 'certificate-sent',
+    name: 'Envio de Certificado',
+    description: 'Certificado PDF anexo enviado ao aluno',
+    mergeVars: ['NAME', 'EXAM_NAME', 'CERTIFICATE_CODE'],
+    eventSlug: 'CERTIFICATE_SENT'
   }
 };
 

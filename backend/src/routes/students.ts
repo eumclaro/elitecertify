@@ -1,4 +1,4 @@
-﻿import { Router, Request, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
@@ -467,7 +467,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         orderBy: { startedAt: 'desc' }
       }),
       prisma.emailLog.findMany({
-        where: { studentId },
+        where: { recipient: studentInfo.user.email },
         orderBy: { createdAt: 'desc' },
         take: 50
       }),

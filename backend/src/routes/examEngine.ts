@@ -4,7 +4,8 @@ import { authMiddleware, requireRole } from '../middleware/auth';
 import { checkPermission } from '../middlewares/checkPermission';
 import { getClientInfo } from '../middleware/audit';
 import { sendExamPassedEmail, sendExamFailedEmail, sendExamAbandonedEmail } from '../services/mail';
-import { generateCertificateCode } from '../services/certificateService';
+import { generateCertificateCode, sendCertificateByEmail } from '../services/certificateService';
+import { triggerExamWebhook } from '../services/webhookService';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -244,6 +245,11 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
           code,
         },
       });
+
+      // Enviar certificado em PDF por e-mail
+      const certStudentName = `${att.student.user.name} ${att.student.lastName || ''}`.trim();
+      sendCertificateByEmail(code, att.student.user.email, certStudentName)
+        .catch(err => console.error('[MAIL] Certificate-Mail Error:', err));
     }
 
     const { ip, device } = getClientInfo(req);
@@ -281,6 +287,34 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
         attempt.id
       ).catch((err) => console.error('[MAIL] Fail-Mail Error:', err));
     }
+
+    // DISPARO DE WEBHOOK ASSÍNCRONO
+    triggerExamWebhook(attempt.examId, {
+      event: passed ? 'exam.approved' : 'exam.failed',
+      timestamp: new Date().toISOString(),
+      student: {
+        id: att.student.id,
+        name: `${att.student.user.name} ${att.student.lastName || ''}`.trim(),
+        email: att.student.user.email,
+      },
+      exam: {
+        id: att.exam.id,
+        title: att.exam.title,
+      },
+      attempt: {
+        id: attempt.id,
+        score,
+        passed,
+        totalQuestions,
+        correctAnswers,
+      },
+      ...(certificate ? {
+        certificate: {
+          code: certificate.code,
+          validationUrl: `${process.env.PRODUCTION_URL || 'https://certify.elitetraining.com.br'}/api/certificates/validate/${certificate.code}`,
+        }
+      } : {}),
+    }).catch(err => console.error('[Webhook] Trigger Error:', err));
 
     return res.json({ attempt: updated, score, passed, correctAnswers, totalQuestions, certificate });
   } catch (error: any) {

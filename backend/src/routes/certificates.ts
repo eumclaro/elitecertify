@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
-import { generateCertificatePdf } from '../services/certificateService';
+import { generateCertificatePdf, sendCertificateByEmail } from '../services/certificateService';
 
 const router = Router();
 
@@ -105,6 +105,35 @@ router.get('/validate/:code', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[CertificateValidate]', error);
     return res.status(500).json({ error: 'Erro ao validar certificado.' });
+  }
+});
+
+// POST /api/certificates/:code/send-email — Reenviar certificado por e-mail
+router.post('/:code/send-email', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const code = req.params.code as string;
+
+    const certificate = await prisma.certificate.findUnique({
+      where: { code },
+      include: {
+        student: { include: { user: true } },
+        exam: true,
+      },
+    }) as any;
+
+    if (!certificate) {
+      return res.status(404).json({ error: 'Certificado não encontrado.' });
+    }
+
+    const studentName = `${certificate.student.user.name} ${certificate.student.lastName ?? ''}`.trim();
+    const studentEmail = certificate.student.user.email;
+
+    await sendCertificateByEmail(code, studentEmail, studentName);
+
+    return res.json({ message: 'Certificado reenviado por e-mail com sucesso.' });
+  } catch (error: any) {
+    console.error('[CertificateResend] Error:', error.message);
+    return res.status(500).json({ error: 'Erro ao reenviar certificado por e-mail.' });
   }
 });
 

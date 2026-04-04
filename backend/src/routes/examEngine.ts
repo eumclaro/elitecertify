@@ -199,7 +199,7 @@ router.post('/answer', authMiddleware, async (req: Request, res: Response) => {
             0,
             exam.questionCount,
             endsAt || undefined,
-            student.lastName || '',
+            student.lastName || undefined,
             attempt.id,
             student.id
           ).catch(err => console.error('[MAIL] Timeout-Email Error:', err));
@@ -335,9 +335,8 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
         score,
         correctAnswers,
         totalQuestions,
-        // futuramente gerar URL de print do certificado
-        undefined,
-        att.student.lastName || '',
+        undefined, // certificateUrl
+        att.student.lastName || undefined,
         att.student.id
       ).catch((err) => console.error('[MAIL] Pass-Mail Error:', err));
     } else {
@@ -349,7 +348,7 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
         correctAnswers,
         totalQuestions,
         endsAt || undefined,
-        att.student.lastName || '',
+        att.student.lastName || undefined,
         attempt.id,
         att.student.id
       ).catch((err) => console.error('[MAIL] Fail-Mail Error:', err));

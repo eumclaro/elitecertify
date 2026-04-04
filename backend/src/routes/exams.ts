@@ -104,7 +104,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreat
     const {
       title, description, questionCount,
       durationMinutes, passingScore, maxAttempts,
-      cooldownDays, questionOrder, status
+      cooldownDays, questionOrder, status, webhookUrl
     } = req.body;
 
     if (!title) {
@@ -122,6 +122,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreat
         cooldownDays: cooldownDays || 0,
         questionOrder: questionOrder || 'FIXED',
         status: status || 'DRAFT',
+        webhookUrl: webhookUrl || null,
       },
       include: {
         _count: { select: { questions: true } },
@@ -145,7 +146,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdi
     const {
       title, description, questionCount,
       durationMinutes, passingScore, maxAttempts,
-      cooldownDays, questionOrder, status
+      cooldownDays, questionOrder, status, webhookUrl
     } = req.body;
 
     const existing = await prisma.exam.findUnique({ where: { id: req.params.id as string } });
@@ -165,6 +166,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdi
         ...(cooldownDays !== undefined && { cooldownDays }),
         ...(questionOrder !== undefined && { questionOrder }),
         ...(status !== undefined && { status }),
+        ...(webhookUrl !== undefined && { webhookUrl: webhookUrl || null }),
       },
       include: {
         releases: true,

@@ -103,7 +103,7 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
 
   try {
     const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0' })
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 })
     await page.emulateMediaType('screen')
 
     const pdf = await page.pdf({
@@ -111,6 +111,7 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
       height: '210mm',
       printBackground: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      timeout: 15000
     })
 
     return Buffer.from(pdf)
@@ -203,7 +204,8 @@ export async function sendCertificateByEmail(
         content: pdfBuffer.toString('base64'),
         type: 'application/pdf'
       },
-      certificate.code
+      certificate.code,
+      certificate.studentId
     )
 
     // Atualizar dispatch com sucesso

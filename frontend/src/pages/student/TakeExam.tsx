@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { toast } from 'sonner';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -150,7 +151,7 @@ export default function TakeExam() {
       if (pct <= 33) {
         alerted33Ref.current = true;
         const minsRemaining = Math.ceil(timeLeft / 60);
-        alert(`⚠️ Atenção: Menos de ${minsRemaining} minutos restantes!`);
+        toast.warning(`⚠️ Atenção: Menos de ${minsRemaining} minutos restantes!`);
       }
     }
 

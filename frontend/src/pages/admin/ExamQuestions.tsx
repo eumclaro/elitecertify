@@ -1,6 +1,53 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  Plus,
+  Upload,
+  Download,
+  ChevronUp,
+  ChevronDown,
+  Edit2,
+  Trash2,
+  CheckCircle2,
+  Loader2,
+  FileText,
+  GripVertical,
+  X,
+  AlertCircle,
+} from "lucide-react";
 
 interface Alternative {
   id?: string;
@@ -58,7 +105,10 @@ export default function ExamQuestions() {
       ]);
       setExam(examRes.data);
       setQuestions(questRes.data);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao carregar questões');
+    }
     setLoading(false);
   };
 
@@ -106,36 +156,31 @@ export default function ExamQuestions() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     let payloadAlts: any = [];
-    
+
     if (formType !== 'ESSAY') {
       const altsFiltered = formAlts.filter(a => a.text.trim());
-      if (altsFiltered.length < 2) { alert('Mínimo 2 alternativas'); return; }
-      if (!altsFiltered.some(a => a.isCorrect)) { alert('Marque pelo menos uma alternativa correta'); return; }
+      if (altsFiltered.length < 2) { toast.error('Mínimo 2 alternativas'); return; }
+      if (!altsFiltered.some(a => a.isCorrect)) { toast.error('Marque pelo menos uma alternativa correta'); return; }
       payloadAlts = altsFiltered.map((a, i) => ({ text: a.text, isCorrect: a.isCorrect, order: i + 1 }));
     }
 
     try {
       if (editing) {
         await api.put(`/exams/${examId}/questions/${editing.id}`, {
-          text: formText, type: formType,
-          alternatives: payloadAlts,
+          text: formText, type: formType, alternatives: payloadAlts,
         });
+        toast.success('Questão atualizada');
       } else {
         await api.post(`/exams/${examId}/questions`, {
-          text: formText, type: formType,
-          alternatives: payloadAlts,
+          text: formText, type: formType, alternatives: payloadAlts,
         });
+        toast.success('Questão criada');
       }
       setShowModal(false);
       loadData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao salvar questão');
+      toast.error(err.response?.data?.error || 'Erro ao salvar questão');
     }
-  };
-
-  const openDelete = (q: Question) => {
-    setDeleteModalItem(q);
-    setDeleteConfirmText('');
   };
 
   const confirmDelete = async () => {
@@ -143,9 +188,10 @@ export default function ExamQuestions() {
     try {
       await api.delete(`/exams/${examId}/questions/${deleteModalItem.id}`);
       setDeleteModalItem(null);
+      toast.success('Questão excluída');
       loadData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao excluir questão');
+      toast.error(err.response?.data?.error || 'Erro ao excluir questão');
     }
   };
 
@@ -155,13 +201,9 @@ export default function ExamQuestions() {
 
     const newQuestions = [...questions];
     const targetIndex = direction === 'UP' ? index - 1 : index + 1;
-
-    // Swap
     const temp = newQuestions[index];
     newQuestions[index] = newQuestions[targetIndex];
     newQuestions[targetIndex] = temp;
-
-    // Update orders locally
     newQuestions.forEach((q, i) => { q.order = i + 1; });
     setQuestions(newQuestions);
 
@@ -169,8 +211,8 @@ export default function ExamQuestions() {
       const orders = newQuestions.map(q => ({ id: q.id, order: q.order }));
       await api.post(`/exams/${examId}/questions/reorder`, { orders });
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao reorganizar questões');
-      loadData(); // Revert on failure
+      toast.error(err.response?.data?.error || 'Erro ao reorganizar questões');
+      loadData();
     }
   };
 
@@ -178,7 +220,7 @@ export default function ExamQuestions() {
     const csv = 'texto_questao;tipo;alternativa_A;correta_A;alternativa_B;correta_B;alternativa_C;correta_C;alternativa_D;correta_D;alternativa_E;correta_E\n' +
                 'Qual é a capital do Brasil?;SINGLE_CHOICE;Brasília;S;Buenos Aires;N;Rio de Janeiro;N;São Paulo;N;;\n' +
                 'Descreva suas motivações para aprender TS.;ESSAY;;;;;;;;;;';
-    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8' }); // UTF-8 BOM para Excel
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -191,15 +233,15 @@ export default function ExamQuestions() {
     if (!importFile) return;
     setImporting(true);
     setImportErrors([]);
-    
+
     const formData = new FormData();
     formData.append('file', importFile);
-    
+
     try {
       const res = await api.post(`/exams/${examId}/questions/import`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      setImportSuccessMsg(res.data.message);
+      toast.success(res.data.message || 'Importação concluída!');
       setShowImportModal(false);
       setImportFile(null);
       loadData();
@@ -214,218 +256,359 @@ export default function ExamQuestions() {
     }
   };
 
-  if (loading) return <div className="page-loading"><div className="spinner"></div></div>;
+  const typeLabel = (type: string) => {
+    switch (type) {
+      case 'SINGLE_CHOICE': return 'Escolha Única';
+      case 'MULTIPLE_CHOICE': return 'Múltipla Escolha';
+      case 'ESSAY': return 'Dissertativa';
+      default: return type;
+    }
+  };
+
+  const typeBadgeColor = (type: string) => {
+    switch (type) {
+      case 'SINGLE_CHOICE': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+      case 'MULTIPLE_CHOICE': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+      case 'ESSAY': return 'bg-violet-500/10 text-violet-500 border-violet-500/20';
+      default: return '';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[50vh]">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
-    <div className="crud-page">
-      <div className="page-header">
-        <div>
-          <Link to="/admin/exams" className="back-link">← Voltar para Provas</Link>
-          <h2>Questões: {exam?.title}</h2>
-          <p>{questions.length}/{exam?.questionCount} questão(ões)</p>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <Link
+            to="/admin/exams"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
+          >
+            <ArrowLeft className="size-3.5" />
+            Voltar para Provas
+          </Link>
+          <h1 className="text-3xl font-bold tracking-tight">Questões</h1>
+          <div className="flex items-center gap-3">
+            <p className="text-muted-foreground">{exam?.title}</p>
+            <Badge variant="outline" className="font-mono text-xs">
+              {questions.length}/{exam?.questionCount}
+            </Badge>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button className="btn btn-outline" onClick={() => { setShowImportModal(true); setImportErrors([]); setImportFile(null); }}>
-            📥 Importar CSV
-          </button>
-          <button className="btn btn-primary" onClick={openCreate}>+ Nova Questão</button>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setShowImportModal(true); setImportErrors([]); setImportFile(null); }}
+            className="gap-2"
+          >
+            <Upload className="size-3.5" />
+            Importar CSV
+          </Button>
+          <Button size="sm" onClick={openCreate} className="gap-2">
+            <Plus className="size-3.5" />
+            Nova Questão
+          </Button>
         </div>
       </div>
 
       {/* Question Cards */}
-      <div className="questions-list">
-        {questions.length === 0 ? (
-          <div className="empty-card">
-            <p>📝 Nenhuma questão cadastrada. Clique em "+ Nova Questão" para começar.</p>
-          </div>
-        ) : questions.map((q, i) => (
-          <div key={q.id} className="question-card">
-            <div className="question-header">
-              <span className="question-number">Questão {i + 1}</span>
-              <div className="actions" style={{ display: 'flex', gap: '5px' }}>
-                <button className="btn btn-sm btn-outline" disabled={i === 0} onClick={() => moveQuestion(i, 'UP')} title="Mover para cima">↑</button>
-                <button className="btn btn-sm btn-outline" disabled={i === questions.length - 1} onClick={() => moveQuestion(i, 'DOWN')} title="Mover para baixo">↓</button>
-                <div style={{ width: '10px' }}></div> {/* Spacer */}
-                <button className="btn btn-sm btn-outline" onClick={() => openEdit(q)}>Editar</button>
-                <button className="btn btn-sm btn-danger" onClick={() => openDelete(q)}>Excluir</button>
-              </div>
-            </div>
-            <p className="question-text">{q.text}</p>
-            <div className="alternatives-list">
-              {q.type === 'ESSAY' ? (
-                <div className="alternative-item"><span className="alt-text" style={{ fontStyle: 'italic', color: '#9ca3af' }}>Questão Dissertativa (Resposta em texto livre)</span></div>
-              ) : q.alternatives.map((a, j) => (
-                <div key={a.id || j} className={`alternative-item ${a.isCorrect ? 'correct' : ''}`}>
-                  <span className="alt-letter">{String.fromCharCode(65 + j)}</span>
-                  <span className="alt-text">{a.text}</span>
-                  {a.isCorrect && <span className="alt-check">✓</span>}
+      {questions.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl bg-muted/10">
+          <FileText className="size-12 text-muted-foreground/20 mb-4" />
+          <p className="text-muted-foreground font-medium">Nenhuma questão cadastrada</p>
+          <p className="text-sm text-muted-foreground/60 mb-6">Clique em "Nova Questão" para começar</p>
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="size-4" />
+            Criar Primeira Questão
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {questions.map((q, i) => (
+            <div
+              key={q.id}
+              className="bg-card rounded-xl border overflow-hidden hover:border-primary/20 transition-colors"
+            >
+              {/* Question Header */}
+              <div className="flex items-center justify-between p-4 border-b bg-muted/20">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <GripVertical className="size-4" />
+                    <span className="text-sm font-bold tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+                  </div>
+                  <Badge className={typeBadgeColor(q.type)}>{typeLabel(q.type)}</Badge>
                 </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{editing ? 'Editar Questão' : 'Nova Questão'}</h3>
-              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
-            </div>
-            <form onSubmit={handleSubmit} className="modal-body">
-              <div className="form-group">
-                <label>Enunciado *</label>
-                <textarea value={formText} onChange={e => setFormText(e.target.value)} rows={4} required placeholder="Digite o enunciado da questão..." />
-              </div>
-              <div className="form-group">
-                <label>Tipo</label>
-                <select value={formType} onChange={e => setFormType(e.target.value)}>
-                  <option value="SINGLE_CHOICE">Escolha Única</option>
-                  <option value="MULTIPLE_CHOICE">Múltipla Escolha</option>
-                  <option value="ESSAY">Dissertativa</option>
-                </select>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost" size="icon"
+                    className="size-8"
+                    disabled={i === 0}
+                    onClick={() => moveQuestion(i, 'UP')}
+                  >
+                    <ChevronUp className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon"
+                    className="size-8"
+                    disabled={i === questions.length - 1}
+                    onClick={() => moveQuestion(i, 'DOWN')}
+                  >
+                    <ChevronDown className="size-4" />
+                  </Button>
+                  <div className="w-px h-5 bg-border mx-1" />
+                  <Button
+                    variant="ghost" size="icon"
+                    className="size-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => openEdit(q)}
+                  >
+                    <Edit2 className="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon"
+                    className="size-8 text-muted-foreground hover:text-red-500"
+                    onClick={() => { setDeleteModalItem(q); setDeleteConfirmText(''); }}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
               </div>
 
-              {formType !== 'ESSAY' && (
-                <div className="form-group">
-                  <label>Alternativas</label>
+              {/* Question Body */}
+              <div className="p-4">
+                <p className="text-sm leading-relaxed mb-3">{q.text}</p>
+
+                {q.type === 'ESSAY' ? (
+                  <p className="text-xs italic text-muted-foreground border rounded-lg p-3 bg-muted/10">
+                    Questão dissertativa — resposta em texto livre
+                  </p>
+                ) : (
+                  <div className="grid gap-1.5">
+                    {q.alternatives.map((a, j) => (
+                      <div
+                        key={a.id || j}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          a.isCorrect
+                            ? 'bg-emerald-500/10 border border-emerald-500/20'
+                            : 'bg-muted/30 border border-transparent'
+                        }`}
+                      >
+                        <span className={`flex items-center justify-center size-6 rounded-md text-xs font-bold ${
+                          a.isCorrect
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {String.fromCharCode(65 + j)}
+                        </span>
+                        <span className="flex-1">{a.text}</span>
+                        {a.isCorrect && <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create/Edit Dialog */}
+      <Dialog open={showModal} onOpenChange={(open) => !open && setShowModal(false)}>
+        <DialogContent className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Editar Questão' : 'Nova Questão'}</DialogTitle>
+            <DialogDescription>
+              {editing ? 'Altere o enunciado e alternativas da questão.' : 'Preencha o enunciado e configure as alternativas.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label>Enunciado *</Label>
+              <Textarea
+                value={formText}
+                onChange={e => setFormText(e.target.value)}
+                rows={4}
+                required
+                placeholder="Digite o enunciado da questão..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={formType} onValueChange={setFormType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SINGLE_CHOICE">Escolha Única</SelectItem>
+                  <SelectItem value="MULTIPLE_CHOICE">Múltipla Escolha</SelectItem>
+                  <SelectItem value="ESSAY">Dissertativa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formType !== 'ESSAY' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Alternativas</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addAlternative} className="gap-1.5 h-7 text-xs">
+                    <Plus className="size-3" />
+                    Adicionar
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
                   {formAlts.map((alt, i) => (
-                    <div key={i} className="alt-input-row">
-                      <span className="alt-letter-input">{String.fromCharCode(65 + i)}</span>
-                      <input
-                        type="text" value={alt.text}
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="flex items-center justify-center size-8 rounded-md bg-muted text-xs font-bold text-muted-foreground shrink-0">
+                        {String.fromCharCode(65 + i)}
+                      </span>
+                      <Input
+                        value={alt.text}
                         onChange={e => updateAlt(i, 'text', e.target.value)}
                         placeholder={`Alternativa ${String.fromCharCode(65 + i)}`}
+                        className="flex-1"
                       />
-                      <label className="alt-correct-label">
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer whitespace-nowrap select-none">
                         <input
                           type={formType === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'}
                           name="correct-alt"
                           checked={alt.isCorrect}
                           onChange={() => updateAlt(i, 'isCorrect', formType === 'SINGLE_CHOICE' ? true : !alt.isCorrect)}
+                          className="accent-emerald-500"
                         />
                         Correta
                       </label>
-                      <button type="button" className="btn btn-sm btn-danger" onClick={() => removeAlternative(i)} disabled={formAlts.length <= 2}>✕</button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-muted-foreground hover:text-red-500 shrink-0"
+                        onClick={() => removeAlternative(i)}
+                        disabled={formAlts.length <= 2}
+                      >
+                        <X className="size-3.5" />
+                      </Button>
                     </div>
                   ))}
-                  <button type="button" className="btn btn-sm btn-outline" onClick={addAlternative}>+ Adicionar Alternativa</button>
                 </div>
-              )}
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Salvar' : 'Criar Questão'}</button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+            )}
 
-      {/* Delete Modal */}
-      {deleteModalItem && (
-        <div className="modal-overlay" onClick={() => setDeleteModalItem(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ color: '#ef4444' }}>Excluir Questão</h3>
-              <button className="modal-close" onClick={() => setDeleteModalItem(null)}>✕</button>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
+              <Button type="submit">{editing ? 'Salvar Alterações' : 'Criar Questão'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteModalItem} onOpenChange={(open) => !open && setDeleteModalItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-500">Excluir Questão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta questão? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {deleteModalItem && (
+            <div className="my-2 p-3 bg-red-500/5 border border-red-500/10 rounded-lg text-sm italic text-muted-foreground">
+              "{deleteModalItem.text.substring(0, 120)}{deleteModalItem.text.length > 120 ? '...' : ''}"
             </div>
-            <div className="modal-body">
-              <p>Tem certeza que deseja excluir esta questão?</p>
-              <blockquote style={{ margin: '1rem 0', padding: '1rem', background: '#2a1a1a', borderLeft: '4px solid #ef4444', color: '#fca5a5', borderRadius: '4px', fontStyle: 'italic' }}>
-                "{deleteModalItem.text.substring(0, 100)}..."
-              </blockquote>
-              <div className="form-group" style={{ marginTop: '1.5rem' }}>
-                <label>Digite <strong>EXCLUIR</strong> para confirmar:</label>
-                <input 
-                  type="text" 
-                  value={deleteConfirmText} 
-                  onChange={e => setDeleteConfirmText(e.target.value)} 
-                  placeholder="EXCLUIR"
-                  style={{ borderColor: deleteConfirmText === 'EXCLUIR' ? '#22c55e' : '' }}
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setDeleteModalItem(null)}>Cancelar</button>
-              <button 
-                type="button" 
-                className="btn btn-danger" 
-                disabled={deleteConfirmText !== 'EXCLUIR'}
-                onClick={confirmDelete}
-              >
-                Excluir Definitivamente
-              </button>
-            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Digite <strong>EXCLUIR</strong> para confirmar:</Label>
+            <Input
+              value={deleteConfirmText}
+              onChange={e => setDeleteConfirmText(e.target.value)}
+              placeholder="EXCLUIR"
+              className={deleteConfirmText === 'EXCLUIR' ? 'border-emerald-500 ring-1 ring-emerald-500' : ''}
+            />
           </div>
-        </div>
-      )}
 
-      {/* Import Modal */}
-      {showImportModal && (
-        <div className="modal-overlay" onClick={() => !importing && setShowImportModal(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Importar Questões via CSV</h3>
-              <button className="modal-close" onClick={() => !importing && setShowImportModal(false)}>✕</button>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteConfirmText !== 'EXCLUIR'}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Excluir Definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Import Dialog */}
+      <Dialog open={showImportModal} onOpenChange={(open) => !importing && setShowImportModal(open)}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Importar Questões via CSV</DialogTitle>
+            <DialogDescription>
+              Envie um arquivo <code className="text-xs bg-muted px-1 py-0.5 rounded">.csv</code> para inserção em lote de questões.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleImportSubmit} className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">Template de Referência</p>
+                <p className="text-xs text-muted-foreground">Baixe o nosso template para evitar erros (separador: ;)</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={downloadTemplate} className="gap-1.5 shrink-0">
+                <Download className="size-3" />
+                Baixar
+              </Button>
             </div>
-            <form onSubmit={handleImportSubmit} className="modal-body">
-              <p>Envie um arquivo <code>.csv</code> contendo a estrutura esperada para inserção em lote de questões.</p>
-              
-              <div style={{ background: '#1f2937', padding: '1rem', borderRadius: '4px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <strong>Formato Opcional/Template</strong>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#9ca3af' }}>Recomendamos baixar o nosso template para evitar erros de formatação (separador usado: ';').</p>
-                </div>
-                <button type="button" className="btn btn-sm btn-secondary" onClick={downloadTemplate}>Baixar Template</button>
+
+            <div className="space-y-2">
+              <Label>Arquivo CSV *</Label>
+              <Input
+                type="file"
+                accept=".csv"
+                required
+                onChange={e => setImportFile(e.target.files?.[0] || null)}
+                className="cursor-pointer"
+              />
+            </div>
+
+            {importErrors.length > 0 && (
+              <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-lg space-y-2 max-h-[200px] overflow-y-auto">
+                <p className="text-sm font-medium text-red-500 flex items-center gap-1.5">
+                  <AlertCircle className="size-3.5" />
+                  Atenção
+                </p>
+                <ul className="text-xs text-red-400 space-y-1 list-disc pl-4">
+                  {importErrors.map((err, i) => <li key={i}>{err}</li>)}
+                </ul>
               </div>
+            )}
 
-              <div className="form-group">
-                <label>Arquivo CSV *</label>
-                <input 
-                  type="file" 
-                  accept=".csv" 
-                  required
-                  onChange={e => setImportFile(e.target.files?.[0] || null)}
-                  style={{ display: 'block', padding: '0.5rem 0' }}
-                />
-              </div>
-
-              {importErrors.length > 0 && (
-                <div style={{ background: '#2a1a1a', borderLeft: '4px solid #ef4444', padding: '1rem', marginTop: '1rem', color: '#fca5a5', borderRadius: '4px', maxHeight: '200px', overflowY: 'auto' }}>
-                  <p style={{ fontWeight: 'bold', margin: '0 0 0.5rem 0' }}>Atenção:</p>
-                  <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.9rem' }}>
-                    {importErrors.map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
-
-              <div className="modal-footer" style={{ marginTop: '1.5rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowImportModal(false)} disabled={importing}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={!importFile || importing}>
-                  {importing ? 'Importando...' : 'Iniciar Importação'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Import Success Modal */}
-      {importSuccessMsg && (
-        <div className="modal-overlay" onClick={() => setImportSuccessMsg('')}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ textAlign: 'center', maxWidth: '400px' }}>
-            <div style={{ fontSize: '3.5rem', margin: '0.5rem 0', color: '#10b981' }}>🎉</div>
-            <h3 style={{ marginBottom: '1rem', color: '#10b981', fontSize: '1.5rem' }}>Importação Concluída!</h3>
-            <p style={{ color: '#d1d5db', marginBottom: '2rem', fontSize: '1.1rem' }}>{importSuccessMsg}</p>
-            <button className="btn btn-primary" style={{ width: '100%', padding: '0.75rem' }} onClick={() => setImportSuccessMsg('')}>
-              Continuar
-            </button>
-          </div>
-        </div>
-      )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowImportModal(false)} disabled={importing}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={!importFile || importing} className="gap-2">
+                {importing && <Loader2 className="size-3.5 animate-spin" />}
+                {importing ? 'Importando...' : 'Iniciar Importação'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

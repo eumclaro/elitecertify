@@ -542,13 +542,20 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
 
         if (statusTitle) {
           const isTimeout = a.resultStatus === 'FAILED_TIMEOUT';
+          const durationMs = a.finishedAt
+            ? new Date(a.finishedAt).getTime() - new Date(a.startedAt).getTime()
+            : null;
+          const durationMinutes = durationMs !== null ? Math.floor(durationMs / 60000) : null;
+          const durationSeconds = durationMs !== null ? Math.floor((durationMs % 60000) / 1000) : null;
+          const durationLabel = durationMinutes !== null ? `Duração: ${durationMinutes}m ${durationSeconds}s.` : '';
+          const baseDescription = isTimeout
+            ? `Resultado concluído com nota de ${a.score}%. Motivo: tempo excedido.`
+            : `Resultado concluído com nota de ${a.score}%.`;
           timeline.push({
             type: 'EXAM_RESULT',
             date: a.finishedAt,
             title: statusTitle,
-            description: isTimeout 
-              ? `Resultado concluído com nota de ${a.score}%. Motivo: tempo excedido.`
-              : `Resultado concluído com nota de ${a.score}%.`,
+            description: `${baseDescription} ${durationLabel}`.trim(),
             color: color
           });
         }

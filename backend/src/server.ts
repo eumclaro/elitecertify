@@ -26,6 +26,12 @@ import certificateTemplatesRoutes from './routes/certificateTemplates';
 
 const app = express();
 
+// Force UTF-8 charset on all JSON responses
+app.use((_req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  next()
+})
+
 // CORS - allow frontend origins
 app.use(cors({
   origin: [

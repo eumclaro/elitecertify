@@ -128,11 +128,11 @@ export default function TakeExam() {
     setTimeLeft(remaining);
   }, [examData, navigate]);
 
-  const executeSubmit = useCallback(async () => {
+  const executeSubmit = useCallback(async (forcedByTimer = false) => {
     setConfirmSubmit(null);
     setSubmitting(true);
     try {
-      const { data } = await api.post(`/exam-engine/submit/${examData.attempt.id}`);
+      const { data } = await api.post(`/exam-engine/submit/${examData.attempt.id}`, { forcedByTimer });
       navigate(`/student/result/${examData.attempt.id}`, { state: data });
     } catch (err: any) {
       alert(err.response?.data?.error || 'Erro ao submeter prova');
@@ -158,7 +158,7 @@ export default function TakeExam() {
     const interval = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          executeSubmit(); // <--- Força o envio direto sem modal
+          executeSubmit(true); // <--- Força o envio direto sem modal, marcado como timeout
           return 0;
         }
         return prev - 1;

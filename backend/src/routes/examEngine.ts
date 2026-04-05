@@ -270,18 +270,25 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
       return res.status(400).json({ error: 'Tentativa não está em andamento' });
     }
 
+    const { forcedByTimer } = req.body;
     const att: any = attempt;
+    const elapsedMinutes = (Date.now() - new Date(att.startedAt).getTime()) / 60000;
+    const isTimeout = forcedByTimer === true || elapsedMinutes > (att.exam.durationMinutes + 0.5); // flag do frontend ou 30s grace period
+
     // Usar a quantidade exata de questões atribuídas a prova em vez do campo genérico
     const totalQuestions = att.exam._count.questions;
     const correctAnswers = att.answers.filter((a: any) => a.isCorrect).length;
     const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
-    const passed = score >= att.exam.passingScore;
+    
+    // Se estourou o tempo, reprova obrigatoriamente
+    const finalResultStatus = isTimeout ? 'FAILED_TIMEOUT' : (score >= att.exam.passingScore ? 'PASSED' : 'FAILED');
+    const passed = finalResultStatus === 'PASSED';
 
     const updated = await prisma.examAttempt.update({
       where: { id: attemptId as string },
       data: {
         executionStatus: 'FINISHED',
-        resultStatus: passed ? 'PASSED' : 'FAILED',
+        resultStatus: finalResultStatus,
         finishedAt: new Date(),
         score,
         correctAnswers,
@@ -373,6 +380,8 @@ router.post('/submit/:attemptId', authMiddleware, async (req: Request, res: Resp
         passed,
         totalQuestions,
         correctAnswers,
+        status: finalResultStatus,
+        reason: isTimeout ? 'timeout' : 'score'
       },
       ...(certificate ? {
         certificate: {

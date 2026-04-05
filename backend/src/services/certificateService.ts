@@ -95,29 +95,35 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
 </html>
 `
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  })
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('PDF generation timeout')), 20000)
+  )
 
-  try {
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 })
-    await page.emulateMediaType('screen')
-
-    const pdf = await page.pdf({
-      width: '297mm',
-      height: '210mm',
-      printBackground: true,
-      margin: { top: 0, right: 0, bottom: 0, left: 0 },
-      timeout: 15000
-    })
-
-    return Buffer.from(pdf)
-  } finally {
-    await browser.close()
+  const pdfPromise = async (): Promise<Buffer> => {
+    let browser
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      })
+      const page = await browser.newPage()
+      await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 })
+      await page.emulateMediaType('screen')
+      const pdf = await page.pdf({
+        width: '297mm',
+        height: '210mm',
+        printBackground: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+        timeout: 15000
+      })
+      return Buffer.from(pdf)
+    } finally {
+      if (browser) await browser.close().catch(() => {})
+    }
   }
+
+  return Promise.race([pdfPromise(), timeoutPromise])
 }
 
 export async function generateCertificateCode(): Promise<string> {

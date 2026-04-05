@@ -416,7 +416,7 @@ export default function TakeExam() {
             <Button variant="outline" onClick={() => setConfirmSubmit(null)} disabled={submitting}>
               Voltar para a prova
             </Button>
-            <Button onClick={executeSubmit} disabled={submitting}>
+            <Button onClick={() => executeSubmit(false)} disabled={submitting}>
               {submitting ? 'Enviando...' : 'Sim, Finalizar'}
             </Button>
           </DialogFooter>

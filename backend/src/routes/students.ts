@@ -9,7 +9,7 @@ import { getClientInfo } from '../middleware/audit';
 
 const router = Router();
 
-// GET /api/students â€” List all students
+// GET /api/students — List all students
 router.get('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const { search, status, page = '1', limit = '20' } = req.query;
@@ -67,7 +67,7 @@ router.get('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: 
   }
 });
 
-// GET /api/students/:id â€” Get single student
+// GET /api/students/:id — Get single student
 router.get('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const student = await prisma.student.findUnique({
@@ -82,7 +82,7 @@ router.get('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
     });
 
     if (!student) {
-      return res.status(404).json({ error: 'Aluno nÃ£o encontrado' });
+      return res.status(404).json({ error: 'Aluno não encontrado' });
     }
 
     return res.json(student);
@@ -91,7 +91,7 @@ router.get('/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, re
   }
 });
 
-// GET /api/students/:id/cooldowns â€” Get active cooldowns
+// GET /api/students/:id/cooldowns — Get active cooldowns
 router.get('/:id/cooldowns', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const cooldowns = await prisma.cooldown.findMany({
@@ -104,15 +104,15 @@ router.get('/:id/cooldowns', authMiddleware, requireRole('ADMIN'), async (req: R
   }
 });
 
-// POST /api/students/import â€” Import students from a list
+// POST /api/students/import — Import students from a list
 router.post('/import', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { students } = req.body;
     if (!Array.isArray(students)) {
-      return res.status(400).json({ error: 'Payload de importaÃ§Ã£o invÃ¡lido. Esperado array.' });
+      return res.status(400).json({ error: 'Payload de importação inválido. Esperado array.' });
     }
 
-    // PrÃ©-carrega as turmas para vinculaÃ§Ã£o rÃ¡pida sem dezenas de queries no DB
+    // Pré-carrega as turmas para vinculação rápida sem dezenas de queries no DB
     const classes = await prisma.class.findMany({ select: { id: true, name: true } });
 
     const results = {
@@ -131,14 +131,14 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), checkPermission('ca
 
       if (!name || !email) {
         results.errors++;
-        results.details.push(`Linha ${rowNum}: Erro - Nome e email sÃ£o obrigatÃ³rios.`);
+        results.details.push(`Linha ${rowNum}: Erro - Nome e email são obrigatórios.`);
         continue;
       }
 
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         results.ignoredEmail++;
-        results.details.push(`Linha ${rowNum}: Aviso - Email '${email}' jÃ¡ cadastrado. Aluno ignorado.`);
+        results.details.push(`Linha ${rowNum}: Aviso - Email '${email}' já cadastrado. Aluno ignorado.`);
         continue;
       }
 
@@ -146,7 +146,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), checkPermission('ca
         const existingCpf = await prisma.student.findUnique({ where: { cpf } });
         if (existingCpf) {
           results.errors++;
-          results.details.push(`Linha ${rowNum}: Erro - CPF '${cpf}' jÃ¡ cadastrado.`);
+          results.details.push(`Linha ${rowNum}: Erro - CPF '${cpf}' já cadastrado.`);
           continue;
         }
       }
@@ -157,7 +157,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), checkPermission('ca
         if (foundClass) {
           classIdToLink = foundClass.id;
         } else {
-          results.details.push(`Linha ${rowNum}: Aviso - Turma '${className}' nÃ£o localizada. O aluno foi importado sem vÃ­nculo.`);
+          results.details.push(`Linha ${rowNum}: Aviso - Turma '${className}' não localizada. O aluno foi importado sem vínculo.`);
         }
       }
 
@@ -186,7 +186,7 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), checkPermission('ca
           },
         });
         
-        // Disparo assÃ­ncrono para o aluno importado
+        // Disparo assíncrono para o aluno importado
         sendWelcomeEmail(name, email, passwordToUse, lastNameToSave).catch(err => {
           console.error(`Falha silenciosa no envio transacional para importado ${email}`);
         });
@@ -205,24 +205,24 @@ router.post('/import', authMiddleware, requireRole('ADMIN'), checkPermission('ca
   }
 });
 
-// POST /api/students â€” Create student
+// POST /api/students — Create student
 router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { name, lastName, email, password, cpf, phone, classIds } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Nome, email e senha sÃ£o obrigatÃ³rios' });
+      return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      return res.status(409).json({ error: 'Email jÃ¡ cadastrado' });
+      return res.status(409).json({ error: 'Email já cadastrado' });
     }
 
     if (cpf) {
       const existingCpf = await prisma.student.findUnique({ where: { cpf } });
       if (existingCpf) {
-        return res.status(409).json({ error: 'CPF jÃ¡ cadastrado' });
+        return res.status(409).json({ error: 'CPF já cadastrado' });
       }
     }
 
@@ -265,7 +265,7 @@ router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canCreat
   }
 });
 
-// PUT /api/students/:id â€” Update student
+// PUT /api/students/:id — Update student
 router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdit'), async (req: Request, res: Response) => {
   try {
     const { name, lastName, email, password, cpf, phone, status, active, classIds } = req.body;
@@ -276,7 +276,7 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdi
     });
 
     if (!student) {
-      return res.status(404).json({ error: 'Aluno nÃ£o encontrado' });
+      return res.status(404).json({ error: 'Aluno não encontrado' });
     }
 
     // Update user fields
@@ -362,12 +362,12 @@ router.put('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canEdi
   }
 });
 
-// DELETE /api/students/:id â€” Delete student
+// DELETE /api/students/:id — Delete student
 router.delete('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     const student = await prisma.student.findUnique({ where: { id: req.params.id as string } });
     if (!student) {
-      return res.status(404).json({ error: 'Aluno nÃ£o encontrado' });
+      return res.status(404).json({ error: 'Aluno não encontrado' });
     }
 
     const { ip, device } = getClientInfo(req);
@@ -378,14 +378,14 @@ router.delete('/:id', authMiddleware, requireRole('ADMIN'), checkPermission('can
     // Delete user (cascades to student)
     await prisma.user.delete({ where: { id: student.userId as string } });
 
-    return res.json({ message: 'Aluno excluÃ­do com sucesso' });
+    return res.json({ message: 'Aluno excluído com sucesso' });
   } catch (error) {
     console.error('Delete student error:', error);
     return res.status(500).json({ error: 'Erro ao excluir aluno' });
   }
 });
 
-// POST /api/students/:id/resend-access â€” Generate new password and resend welcome email
+// POST /api/students/:id/resend-access — Generate new password and resend welcome email
 router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const student = await prisma.student.findUnique({
@@ -394,10 +394,10 @@ router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), checkPer
     });
 
     if (!student) {
-      return res.status(404).json({ error: 'Aluno nÃ£o encontrado' });
+      return res.status(404).json({ error: 'Aluno não encontrado' });
     }
 
-    // ValidaÃ§Ã£o de VÃ­nculo de Template (Nova Regra Etapa 1)
+    // Validação de Vínculo de Template (Nova Regra Etapa 1)
     const binding = await prisma.emailEventBinding.findUnique({ 
       where: { eventKey: 'STUDENT_CREATED' },
       include: { template: true }
@@ -406,7 +406,7 @@ router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), checkPer
     if (!binding || !binding.isActive || !binding.template) {
       return res.status(412).json({ 
         error: 'TEMPLATE_NOT_CONFIGURED', 
-        message: 'O template STUDENT_CREATED nÃ£o possui um vÃ­nculo ativo configurado.' 
+        message: 'O template STUDENT_CREATED não possui um vínculo ativo configurado.' 
       });
     }
 
@@ -439,7 +439,7 @@ router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), checkPer
   }
 });
 
-// GET /api/students/:id/timeline â€” Unified activity timeline
+// GET /api/students/:id/timeline — Unified activity timeline
 router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id as string;
@@ -453,7 +453,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
       }
     }) as any;
 
-    if (!studentInfo) return res.status(404).json({ error: 'Aluno nÃ£o encontrado' });
+    if (!studentInfo) return res.status(404).json({ error: 'Aluno não encontrado' });
 
     // Fetch all relevant entities in parallel
     const [attempts, cooldowns, emails, referrals, interests, logins, audits] = await Promise.all([
@@ -511,7 +511,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
           type: 'ENROLLMENT',
           date: c.joinedAt,
           title: `Matriculado na turma ${c.class.name}`,
-          description: `Ingresso na turma para realizaÃ§Ã£o de provas e certificaÃ§Ãµes.`,
+          description: `Ingresso na turma para realização de provas e certificações.`,
           color: 'bg-blue-500'
         });
       });
@@ -524,7 +524,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         type: 'EXAM_STARTED',
         date: a.startedAt,
         title: `Iniciou a prova ${a.exam?.title || 'Prova'}`,
-        description: `SessÃ£o aberta via ${a.device || 'dispositivo desconhecido'}.`,
+        description: `Sessão aberta via ${a.device || 'dispositivo desconhecido'}.`,
         color: 'bg-amber-600'
       });
 
@@ -547,8 +547,8 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
             date: a.finishedAt,
             title: statusTitle,
             description: isTimeout 
-              ? `Resultado concluÃ­do com nota de ${a.score}%. Motivo: tempo excedido.`
-              : `Resultado concluÃ­do com nota de ${a.score}%.`,
+              ? `Resultado concluído com nota de ${a.score}%. Motivo: tempo excedido.`
+              : `Resultado concluído com nota de ${a.score}%.`,
             color: color
           });
         }
@@ -560,7 +560,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
           type: 'EXAM_ABANDONED',
           date: a.finishedAt || a.createdAt,
           title: `Desclassificado na prova ${a.exam?.title || 'Prova'}`,
-          description: `A prova foi encerrada por abandono ou expiraÃ§Ã£o de tempo.`,
+          description: `A prova foi encerrada por abandono ou expiração de tempo.`,
           color: 'bg-slate-600'
         });
       }
@@ -571,8 +571,8 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
       timeline.push({
         type: 'COOLDOWN_APPLIED',
         date: c.startedAt,
-        title: `Cooldown aplicado â€” ${c.exam?.title || 'Prova'}`,
-        description: `Acesso bloqueado temporariamente atÃ© ${formatDT(new Date(c.endsAt))}.`,
+        title: `Cooldown aplicado — ${c.exam?.title || 'Prova'}`,
+        description: `Acesso bloqueado temporariamente até ${formatDT(new Date(c.endsAt))}.`,
         color: 'bg-amber-600'
       });
 
@@ -597,7 +597,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
       'COOLDOWN_RELEASED': 'Cooldown liberado',
       'COOLDOWN_APPLIED': 'Cooldown aplicado',
       'STUDENT_CREATED': 'Boas-vindas enviado',
-      'PASSWORD_RESET': 'RedefiniÃ§Ã£o de senha',
+      'PASSWORD_RESET': 'Redefinição de senha',
     };
 
     (emails as any[]).forEach((e: any) => {
@@ -616,7 +616,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         type: 'EMAIL_SENT',
         date: e.createdAt,
         title,
-        description: `ComunicaÃ§Ã£o enviada para ${e.recipient}. Status: ${e.status}`,
+        description: `Comunicação enviada para ${e.recipient}. Status: ${e.status}`,
         color: iconColor
       });
     });
@@ -638,7 +638,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         type: 'INTEREST',
         date: i.createdAt,
         title: `Interesse no evento ${i.event?.title || 'Evento'}`,
-        description: `Demonstrou interesse em participar e receber mais informaÃ§Ãµes.`,
+        description: `Demonstrou interesse em participar e receber mais informações.`,
         color: 'bg-sky-600'
       });
     });
@@ -648,7 +648,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
       timeline.push({
         type: 'LOGIN',
         date: l.createdAt,
-        title: 'Acesso Ã  plataforma',
+        title: 'Acesso à plataforma',
         description: `Login realizado. IP: ${l.ip || 'desconhecido'}.`,
         color: 'bg-zinc-800'
       });
@@ -656,9 +656,9 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
 
     // 9. Admin Actions (Audits)
     (audits as any[]).forEach((audit: any) => {
-      let title = 'AÃ§Ã£o administrativa';
+      let title = 'Ação administrativa';
       let color = 'bg-gray-700';
-      let description = `AÃ§Ã£o realizada por administrador. IP: ${audit.ip || 'desconhecido'}`;
+      let description = `Ação realizada por administrador. IP: ${audit.ip || 'desconhecido'}`;
 
       if (audit.action === 'STUDENT_PROFILE_EDITED') {
         title = 'Perfil editado pelo admin';
@@ -673,7 +673,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         title = 'Conta reativada pelo admin';
         color = 'bg-green-900';
       } else if (audit.action === 'STUDENT_CLASSES_UPDATED') {
-        title = 'Turmas/VÃ­nculos alterados';
+        title = 'Turmas/Vínculos alterados';
         color = 'bg-cyan-700';
       }
 
@@ -726,7 +726,7 @@ function formatDT(date: Date) {
   }).format(date).replace(',', '');
 }
 
-// GET /api/students/:id/referrals â€” Get referrals made by student
+// GET /api/students/:id/referrals — Get referrals made by student
 router.get('/:id/referrals', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id as string;
@@ -738,15 +738,15 @@ router.get('/:id/referrals', authMiddleware, requireRole('ADMIN'), async (req: R
     return res.json(referrals);
   } catch (error) {
     console.error('Student referrals error:', error);
-    return res.status(500).json({ error: 'Erro ao buscar indicaÃ§Ãµes' });
+    return res.status(500).json({ error: 'Erro ao buscar indicações' });
   }
 });
 
-// POST /api/students/:id/enroll â€” Enroll student in a class
+// POST /api/students/:id/enroll — Enroll student in a class
 router.post('/:id/enroll', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
   try {
     const { classId } = req.body;
-    if (!classId) return res.status(400).json({ error: 'ID da turma Ã© obrigatÃ³rio' });
+    if (!classId) return res.status(400).json({ error: 'ID da turma é obrigatório' });
 
     const enrollment = await prisma.classStudent.create({
       data: {
@@ -759,14 +759,14 @@ router.post('/:id/enroll', authMiddleware, requireRole('ADMIN'), checkPermission
     return res.status(201).json(enrollment);
   } catch (error: any) {
     if (error.code === 'P2002') {
-      return res.status(409).json({ error: 'Aluno jÃ¡ estÃ¡ matriculado nesta turma' });
+      return res.status(409).json({ error: 'Aluno já está matriculado nesta turma' });
     }
     console.error('Enroll student error:', error);
     return res.status(500).json({ error: 'Erro ao matricular aluno' });
   }
 });
 
-// DELETE /api/students/:id/unenroll/:classId â€” Unenroll student from a class
+// DELETE /api/students/:id/unenroll/:classId — Unenroll student from a class
 router.delete('/:id/unenroll/:classId', authMiddleware, requireRole('ADMIN'), checkPermission('canDelete'), async (req: Request, res: Response) => {
   try {
     await prisma.classStudent.delete({

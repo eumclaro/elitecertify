@@ -466,7 +466,7 @@ router.get('/:id/timeline', authMiddleware, requireRole('ADMIN'), async (req: Re
         include: { exam: { select: { title: true } } },
         orderBy: { startedAt: 'desc' }
       }),
-      prisma.emailLog.findMany({
+      prisma.emailLog.findMany({ // cache-bust sync
         where: { recipient: studentInfo.user.email },
         orderBy: { createdAt: 'desc' },
         take: 50

@@ -23,6 +23,7 @@ services:
       - backend
     networks:
       - app
+      - coolify
     restart: unless-stopped
 
 networks:

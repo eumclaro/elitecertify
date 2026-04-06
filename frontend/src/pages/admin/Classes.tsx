@@ -680,11 +680,11 @@ export default function Classes() {
                 <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
                   {([
                     { label: 'Total', count: students.length, filter: 'ALL' },
-                    { label: 'Aprovados', count: students.filter(s => s.status === 'APROVADO').length, filter: 'APPROVED' },
-                    { label: 'Reprovados', count: students.filter(s => s.status === 'REPROVADO').length, filter: 'REPROVED' },
+                    { label: 'Aprovados', count: students.filter(s => s.status === 'APPROVED').length, filter: 'APPROVED' },
+                    { label: 'Reprovados', count: students.filter(s => s.status === 'REPROVED').length, filter: 'REPROVED' },
                     { label: 'Bloqueados', count: students.filter(s => s.status === 'COOLDOWN').length, filter: 'COOLDOWN' },
                     { label: 'Pendentes', count: students.filter(s => s.status === 'LIBERADO').length, filter: 'LIBERADO' },
-                    { label: 'Sem vínculo', count: students.filter(s => s.status === 'PENDENTE').length, filter: 'PENDING' },
+                    { label: 'Sem vínculo', count: students.filter(s => s.status === 'PENDING').length, filter: 'PENDING' },
                   ] as const).map(({ label, count, filter }) => (
                     <div
                       key={filter}

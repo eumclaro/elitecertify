@@ -698,7 +698,7 @@ export default function Classes() {
                       <SelectValue placeholder="Selecione o conteúdo do e-mail..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {activeBindings.map(b => (
+                      {activeBindings.filter(b => b?.internalTemplate?.name).map(b => (
                         <SelectItem key={b.internalTemplateId} value={b.internalTemplateId} className="py-3">
                           <div className="flex flex-col">
                             <span className="font-bold">{b.internalTemplate.name}</span>

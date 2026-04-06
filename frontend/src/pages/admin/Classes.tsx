@@ -196,10 +196,16 @@ export default function Classes() {
   const fetchNpsData = async (classId: string) => {
     try {
       const { data } = await api.get('/nps/surveys');
-      setLinkedNps(data.filter((n: any) => n.classId === classId));
-      setAvailableNps(data.filter((n: any) => !n.classId));
+      // Compare both classId FK and class.id relation as fallback (backend includes both)
+      setLinkedNps(data.filter((n: any) =>
+        String(n.classId) === String(classId) || n.class?.id === classId
+      ));
+      setAvailableNps(data.filter((n: any) =>
+        !n.classId && !n.class
+      ));
     } catch (err) {
       console.error(err);
+      toast.error("Erro ao carregar NPS");
     }
   };
 
@@ -479,7 +485,26 @@ export default function Classes() {
                   <ArrowLeft className="size-4" /> Voltar
                 </Button>
                 <div className="h-6 w-px bg-border" />
-                <h1 className="text-2xl font-bold tracking-tight">{classData?.name}</h1>
+                <Select
+                  value={selectedClassId || ''}
+                  onValueChange={(newId) => {
+                    const cls = classes.find(c => c.id === newId);
+                    if (cls) setClassData({ name: cls.name, description: cls.description });
+                    setSelectedClassId(newId);
+                    setActiveFilter('ALL');
+                    fetchClassDetails(newId);
+                    fetchNpsData(newId);
+                  }}
+                >
+                  <SelectTrigger className="h-9 border-none bg-transparent font-bold text-xl shadow-none px-2 gap-2 focus:ring-0 w-auto max-w-[280px]">
+                    <SelectValue>{classData?.name}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map(c => (
+                      <SelectItem key={c.id} value={c.id} className="font-medium">{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
              </div>
              {hasPermission('canSendEmails') && (
                <Button onClick={() => { setSelectedStudent(null); setDispatchStep(1); setIsDispatchOpen(true); fetchBindings(); }} className="gap-2 bg-blue-600 hover:bg-blue-700">
@@ -668,7 +693,7 @@ export default function Classes() {
                           <TableHead className="py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80 text-center">Nota (%)</TableHead>
                           <TableHead className="py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80 text-center">Tentativas</TableHead>
                           <TableHead className="py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80">Última Atividade</TableHead>
-                          <TableHead className="px-6 py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80 text-right">Manutenção</TableHead>
+                          <TableHead className="px-6 py-3 font-black text-[10px] uppercase tracking-widest text-muted-foreground/80 text-right">Comunicação</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

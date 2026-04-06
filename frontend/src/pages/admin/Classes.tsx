@@ -658,76 +658,101 @@ export default function Classes() {
       {/* Dispatch Modal */}
       <Dialog open={isDispatchOpen} onOpenChange={setIsDispatchOpen}>
         <DialogContent className="sm:max-w-lg overflow-hidden p-0">
-          <div className="p-6 bg-gradient-to-br from-primary/5 to-transparent border-b">
-             <div className="flex items-center gap-3 mb-2">
+          <div className="p-5 bg-gradient-to-br from-primary/5 to-transparent border-b flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1.5">
                 <div className="p-2 bg-primary/10 text-primary rounded-lg"><Mail className="size-5" /></div>
                 <h3 className="text-xl font-black tracking-tight">Disparar Comunicação</h3>
-             </div>
-             <p className="text-sm text-muted-foreground">
-               {selectedStudent 
-                ? `Enviar e-mail personalizado diretamente para ${selectedStudent.name}.` 
-                : `Disparar e-mail para todos os alunos da turma ${classData?.name} com base em filtros.`
-               }
-             </p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {selectedStudent
+                  ? `Enviar e-mail personalizado diretamente para ${selectedStudent.name}.`
+                  : `Disparar e-mail para alunos da turma ${classData?.name} com base em filtros.`
+                }
+              </p>
+            </div>
           </div>
 
-          <div className="p-6 pt-4 space-y-6">
+          <div className="p-5 space-y-5">
             {!selectedStudent && (
               <div className="space-y-3">
-                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Filtrar Alunos Destinatários</Label>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                  {(['ALL', 'APPROVED', 'REPROVED', 'LIBERADO', 'PENDING', 'COOLDOWN'] as const).map(f => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => setDispatchFilter(f)}
-                      className={`h-12 flex flex-col items-center justify-center border-2 rounded-xl transition-all ${dispatchFilter === f ? 'border-primary bg-primary/5 shadow-sm scale-105' : 'border-muted hover:border-muted-foreground/30'}`}
+                {/* Contadores */}
+                <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
+                  {([
+                    { label: 'Total', count: students.length, filter: 'ALL' },
+                    { label: 'Aprovados', count: students.filter(s => s.status === 'APROVADO').length, filter: 'APPROVED' },
+                    { label: 'Reprovados', count: students.filter(s => s.status === 'REPROVADO').length, filter: 'REPROVED' },
+                    { label: 'Bloqueados', count: students.filter(s => s.status === 'COOLDOWN').length, filter: 'COOLDOWN' },
+                    { label: 'Pendentes', count: students.filter(s => s.status === 'LIBERADO').length, filter: 'LIBERADO' },
+                    { label: 'Sem vínculo', count: students.filter(s => s.status === 'PENDENTE').length, filter: 'PENDING' },
+                  ] as const).map(({ label, count, filter }) => (
+                    <div
+                      key={filter}
+                      onClick={() => setDispatchFilter(filter)}
+                      className={`cursor-pointer rounded-xl border-2 py-2 px-1 transition-all select-none ${dispatchFilter === filter ? 'border-primary bg-primary/5 shadow-sm' : 'border-muted hover:border-muted-foreground/30'}`}
                     >
-                      <span className="text-[10px] font-black uppercase tracking-tighter">{f === 'ALL' ? 'Todos' : f === 'LIBERADO' ? 'Pendente' : f === 'COOLDOWN' ? 'Bloqueado' : f}</span>
+                      <div className={`text-xl font-black leading-none ${dispatchFilter === filter ? 'text-primary' : 'text-foreground'}`}>{count}</div>
+                      <div className="text-muted-foreground mt-0.5">{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Filtrar destinatários</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: 'ALL', label: 'Todos' },
+                    { value: 'APPROVED', label: 'Aprovados' },
+                    { value: 'REPROVED', label: 'Reprovados' },
+                    { value: 'COOLDOWN', label: 'Bloqueados' },
+                    { value: 'LIBERADO', label: 'Pendentes' },
+                    { value: 'PENDING', label: 'Sem vínculo' },
+                  ] as const).map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setDispatchFilter(value)}
+                      className={`h-9 flex items-center justify-center border-2 rounded-xl transition-all text-[11px] font-black uppercase tracking-tight ${dispatchFilter === value ? 'border-primary bg-primary/5 shadow-sm text-primary' : 'border-muted hover:border-muted-foreground/30 text-muted-foreground'}`}
+                    >
+                      {label}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="space-y-3">
-              <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Escolher Template de E-mail</Label>
-              <div className="space-y-2">
-                  <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                    <SelectTrigger className="h-12 border-2 bg-background data-[placeholder]:text-muted-foreground font-medium">
-                      <SelectValue placeholder="Selecione o conteúdo do e-mail..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeBindings.filter(b => b?.internalTemplate?.name).map(b => (
-                        <SelectItem key={b.internalTemplateId} value={b.internalTemplateId} className="py-3">
-                          <div className="flex flex-col">
-                            <span className="font-bold">{b.internalTemplate.name}</span>
-                            <span className="text-[10px] text-muted-foreground">Gatilho: {b.event}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] bg-amber-50 text-amber-700 p-2 rounded-lg border border-amber-100 flex items-center gap-2">
-                    <AlertCircle className="size-3 shrink-0" />
-                    <strong>Aviso:</strong> Certifique-se de que o template selecionado possui as variáveis (Merge Tags) suportadas.
-                  </p>
-              </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Template de E-mail</Label>
+              <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                <SelectTrigger className="h-11 border-2 bg-background font-medium">
+                  <SelectValue placeholder="Selecione o template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeBindings.filter(b => b?.internalTemplate?.name).map(b => (
+                    <SelectItem key={b.internalTemplateId} value={b.internalTemplateId} className="py-2">
+                      <div className="flex flex-col">
+                        <span className="font-bold">{b.internalTemplate.name}</span>
+                        <span className="text-[10px] text-muted-foreground">Gatilho: {b.eventKey}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] bg-amber-50 text-amber-700 p-2 rounded-lg border border-amber-100 flex items-center gap-2">
+                <AlertCircle className="size-3 shrink-0" />
+                <strong>Aviso:</strong> Confirme que o template possui as Merge Tags adequadas para o evento.
+              </p>
             </div>
-            
-            <div className="pt-2">
-              <Button 
-                onClick={handleDispatch} 
-                disabled={isSending || !selectedTemplate} 
-                className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-black text-lg gap-3 shadow-lg shadow-primary/20 rounded-2xl group"
-              >
-                {isSending ? (
-                  <Loader2 className="size-6 animate-spin" />
-                ) : (
-                  <>Disparar Agora <Send className="size-5 group-hover:translate-x-1 transition-transform" /></>
-                )}
-              </Button>
-            </div>
+
+            <Button
+              onClick={handleDispatch}
+              disabled={isSending || !selectedTemplate}
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-black text-base gap-3 shadow-md shadow-primary/20 rounded-xl group"
+            >
+              {isSending ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : (
+                <>Disparar Agora <Send className="size-4 group-hover:translate-x-1 transition-transform" /></>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

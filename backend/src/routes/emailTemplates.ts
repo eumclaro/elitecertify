@@ -259,7 +259,6 @@ router.post('/dispatch', authMiddleware, requireRole('ADMIN'), checkPermission('
               provider: 'MANDRILL',
               status: 'SENT',
               sentAt: new Date(),
-              studentId: student.id,
             }
           });
 

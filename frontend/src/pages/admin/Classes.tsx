@@ -696,26 +696,7 @@ export default function Classes() {
                     </div>
                   ))}
                 </div>
-                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Filtrar destinatários</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { value: 'ALL', label: 'Todos' },
-                    { value: 'APPROVED', label: 'Aprovados' },
-                    { value: 'REPROVED', label: 'Reprovados' },
-                    { value: 'COOLDOWN', label: 'Bloqueados' },
-                    { value: 'LIBERADO', label: 'Pendentes' },
-                    { value: 'PENDING', label: 'Sem vínculo' },
-                  ] as const).map(({ value, label }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setDispatchFilter(value)}
-                      className={`h-9 flex items-center justify-center border-2 rounded-xl transition-all text-[11px] font-black uppercase tracking-tight ${dispatchFilter === value ? 'border-primary bg-primary/5 shadow-sm text-primary' : 'border-muted hover:border-muted-foreground/30 text-muted-foreground'}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+
               </div>
             )}
 

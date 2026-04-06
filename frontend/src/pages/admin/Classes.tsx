@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import api from '../../services/api';
 import {
   Table,
@@ -44,7 +44,9 @@ import {
   FileJson,
   Unlock,
   Send,
-  UserMinus
+  UserMinus,
+  MessageSquare,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -129,6 +131,37 @@ export default function Classes() {
 
   const setDispatchStep = (_step: number) => {}; // No longer needed but keeping for minimal JSX change if still referenced
 
+  // Table filter state
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'APPROVED' | 'REPROVED' | 'COOLDOWN' | 'LIBERADO' | 'PENDING'>('ALL');
+
+  const filteredStudents = useMemo(() => {
+    if (activeFilter === 'ALL') return students;
+    return students.filter(s => s.status === activeFilter);
+  }, [students, activeFilter]);
+
+  const handleCardClick = (filter: typeof activeFilter) => {
+    setActiveFilter(prev => prev === filter ? 'ALL' : filter);
+  };
+
+  // NPS state
+  const [linkedNps, setLinkedNps] = useState<any[]>([]);
+  const [availableNps, setAvailableNps] = useState<any[]>([]);
+  const [npsToLink, setNpsToLink] = useState('');
+  const [isLinkingNps, setIsLinkingNps] = useState(false);
+
+  // Format date helper (fixes Invalid Date bug)
+  const formatActivityDate = (date: string | null | undefined): string => {
+    if (!date) return 'Nunca';
+    const parsed = new Date(date);
+    return isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString();
+  };
+
+  const formatActivityTime = (date: string | null | undefined): string | null => {
+    if (!date) return null;
+    const parsed = new Date(date);
+    return isNaN(parsed.getTime()) ? null : parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   const fetchClasses = async (search = classSearch) => {
     setLoading(true);
     try {
@@ -157,6 +190,52 @@ export default function Classes() {
       toast.error("Erro ao carregar detalhes da turma");
     } finally {
       setLoadingManage(false);
+    }
+  };
+
+  const fetchNpsData = async (classId: string) => {
+    try {
+      const { data } = await api.get('/nps/surveys');
+      setLinkedNps(data.filter((n: any) => n.classId === classId));
+      setAvailableNps(data.filter((n: any) => !n.classId));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleLinkNps = async () => {
+    if (!npsToLink || !selectedClassId) return toast.error("Selecione um NPS");
+    setIsLinkingNps(true);
+    try {
+      await api.put(`/nps/surveys/${npsToLink}`, { classId: selectedClassId });
+      toast.success("NPS vinculado à turma!");
+      setNpsToLink('');
+      fetchNpsData(selectedClassId);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Erro ao vincular NPS");
+    } finally {
+      setIsLinkingNps(false);
+    }
+  };
+
+  const handleUnlinkNps = async (npsId: string) => {
+    if (!selectedClassId) return;
+    if (!confirm("Remover o vínculo deste NPS com a turma?")) return;
+    try {
+      await api.put(`/nps/surveys/${npsId}`, { classId: null });
+      toast.success("Vínculo removido");
+      fetchNpsData(selectedClassId);
+    } catch (err) {
+      toast.error("Erro ao remover vínculo");
+    }
+  };
+
+  const handleSendNps = async (npsId: string) => {
+    try {
+      await api.post(`/nps/surveys/${npsId}/send`);
+      toast.success("NPS enviado para os alunos da turma!");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Erro ao enviar NPS");
     }
   };
 
@@ -205,7 +284,9 @@ export default function Classes() {
     const cls = classes.find(c => c.id === id);
     if (cls) setClassData({ name: cls.name, description: cls.description });
     setView('manage');
+    setActiveFilter('ALL');
     fetchClassDetails(id);
+    fetchNpsData(id);
   };
 
   const handleBackToList = () => {
@@ -214,6 +295,9 @@ export default function Classes() {
     setClassData(null);
     setStudents([]);
     setMetrics(null);
+    setLinkedNps([]);
+    setAvailableNps([]);
+    setActiveFilter('ALL');
   };
 
   const openNew = () => { setEditing(null); setForm({ name: '', description: '' }); setShowModal(true); };
@@ -405,42 +489,40 @@ export default function Classes() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-            <Card className="bg-blue-50/50 border-blue-100 shadow-sm">
-              <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-blue-500/10 text-blue-600 rounded-lg shadow-inner"><Users className="size-5" /></div>
-                <div><p className="text-[10px] text-blue-600 uppercase font-black tracking-wider">Total</p><p className="text-2xl font-black text-blue-700">{metrics?.total || 0}</p></div>
-              </CardContent>
-            </Card>
-            <Card className="bg-green-50/50 border-green-100 shadow-sm">
-              <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-green-500/10 text-green-600 rounded-lg shadow-inner"><CheckCircle2 className="size-5" /></div>
-                <div><p className="text-[10px] text-green-600 uppercase font-black tracking-wider">Aprov.</p><p className="text-2xl font-black text-green-700">{metrics?.approved || 0}</p></div>
-              </CardContent>
-            </Card>
-            <Card className="bg-red-50/50 border-red-100 shadow-sm">
-              <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-red-500/10 text-red-600 rounded-lg shadow-inner"><AlertCircle className="size-5" /></div>
-                <div><p className="text-[10px] text-red-600 uppercase font-black tracking-wider">Reprov.</p><p className="text-2xl font-black text-red-700">{metrics?.reproved || 0}</p></div>
-              </CardContent>
-            </Card>
-            <Card className="bg-amber-50/50 border-amber-100 shadow-sm">
-              <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-amber-500/10 text-amber-600 rounded-lg shadow-inner"><Clock className="size-5" /></div>
-                <div><p className="text-[10px] text-amber-600 uppercase font-black tracking-wider">Cooldown</p><p className="text-2xl font-black text-amber-700">{metrics?.cooldown || 0}</p></div>
-              </CardContent>
-            </Card>
-            <Card className="bg-purple-50/50 border-purple-100 shadow-sm">
-              <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-purple-500/10 text-purple-600 rounded-lg shadow-inner"><Target className="size-5" /></div>
-                <div><p className="text-[10px] text-purple-600 uppercase font-black tracking-wider">Liberado</p><p className="text-2xl font-black text-purple-700">{metrics?.released || 0}</p></div>
-              </CardContent>
-            </Card>
-            <Card className="bg-slate-50/50 border-slate-100 shadow-sm">
-              <CardContent className="p-4 pt-4 flex items-center gap-4">
-                <div className="p-2 bg-slate-500/10 text-slate-600 rounded-lg shadow-inner"><UserMinus className="size-5" /></div>
-                <div><p className="text-[10px] text-slate-600 uppercase font-black tracking-wider">Nunca tentou</p><p className="text-2xl font-black text-slate-700">{metrics?.pending || 0}</p></div>
-              </CardContent>
-            </Card>
+            {([
+              { filter: 'ALL', label: 'Total', value: metrics?.total || 0, color: 'blue', icon: <Users className="size-5" /> },
+              { filter: 'APPROVED', label: 'Aprov.', value: metrics?.approved || 0, color: 'green', icon: <CheckCircle2 className="size-5" /> },
+              { filter: 'REPROVED', label: 'Reprov.', value: metrics?.reproved || 0, color: 'red', icon: <AlertCircle className="size-5" /> },
+              { filter: 'COOLDOWN', label: 'Cooldown', value: metrics?.cooldown || 0, color: 'amber', icon: <Clock className="size-5" /> },
+              { filter: 'LIBERADO', label: 'Liberado', value: metrics?.released || 0, color: 'purple', icon: <Target className="size-5" /> },
+              { filter: 'PENDING', label: 'Nunca tentou', value: metrics?.pending || 0, color: 'slate', icon: <UserMinus className="size-5" /> },
+            ] as const).map(({ filter, label, value, color, icon }) => {
+              const isActive = activeFilter === filter;
+              const colorMap = {
+                blue:   { card: 'bg-blue-50/50 border-blue-100',     active: 'ring-2 ring-blue-400 border-blue-300',   icon: 'bg-blue-500/10 text-blue-600',   label: 'text-blue-600',   num: 'text-blue-700' },
+                green:  { card: 'bg-green-50/50 border-green-100',   active: 'ring-2 ring-green-400 border-green-300', icon: 'bg-green-500/10 text-green-600', label: 'text-green-600', num: 'text-green-700' },
+                red:    { card: 'bg-red-50/50 border-red-100',       active: 'ring-2 ring-red-400 border-red-300',     icon: 'bg-red-500/10 text-red-600',     label: 'text-red-600',   num: 'text-red-700' },
+                amber:  { card: 'bg-amber-50/50 border-amber-100',   active: 'ring-2 ring-amber-400 border-amber-300', icon: 'bg-amber-500/10 text-amber-600', label: 'text-amber-600', num: 'text-amber-700' },
+                purple: { card: 'bg-purple-50/50 border-purple-100', active: 'ring-2 ring-purple-400 border-purple-300', icon: 'bg-purple-500/10 text-purple-600', label: 'text-purple-600', num: 'text-purple-700' },
+                slate:  { card: 'bg-slate-50/50 border-slate-100',   active: 'ring-2 ring-slate-400 border-slate-300', icon: 'bg-slate-500/10 text-slate-600', label: 'text-slate-600', num: 'text-slate-700' },
+              };
+              const c = colorMap[color];
+              return (
+                <Card
+                  key={filter}
+                  onClick={() => handleCardClick(filter)}
+                  className={`cursor-pointer transition-all shadow-sm ${c.card} ${isActive ? c.active + ' shadow-md' : 'hover:shadow-md'}`}
+                >
+                  <CardContent className="p-4 pt-4 flex items-center gap-4">
+                    <div className={`p-2 rounded-lg shadow-inner ${c.icon}`}>{icon}</div>
+                    <div>
+                      <p className={`text-[10px] uppercase font-black tracking-wider ${c.label}`}>{label}</p>
+                      <p className={`text-2xl font-black ${c.num}`}>{value}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
@@ -487,9 +569,9 @@ export default function Classes() {
                                <span className="text-[10px] text-muted-foreground">{new Date(r.createdAt).toLocaleDateString()}</span>
                              </div>
                              {hasPermission('canEdit') && (
-                               <Button 
-                                variant="ghost" 
-                                size="icon" 
+                               <Button
+                                variant="ghost"
+                                size="icon"
                                 className="absolute right-1 top-1/2 -translate-y-1/2 size-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
                                 onClick={() => handleUnlinkExam(r.examId, r.id)}
                                >
@@ -500,6 +582,64 @@ export default function Classes() {
                         ))}
                      </div>
                    )}
+                </div>
+
+                {/* NPS Section */}
+                <div className="pt-2 border-t space-y-3">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <MessageSquare className="size-4 text-blue-500" /> NPS Vinculados
+                  </CardTitle>
+                  {hasPermission('canEdit') && (
+                    <div className="p-3 bg-background rounded-xl border-2 border-dashed space-y-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground opacity-60">Liberar NPS para Turma</p>
+                      <div className="flex gap-2">
+                        <Select value={npsToLink} onValueChange={setNpsToLink}>
+                          <SelectTrigger className="bg-muted/30 h-10 border-none">
+                            <SelectValue placeholder="Selecionar..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableNps.map((n: any) => (
+                              <SelectItem key={n.id} value={n.id}>{n.title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button size="icon" onClick={handleLinkNps} disabled={isLinkingNps} className="shrink-0 bg-primary/20 text-primary hover:bg-primary/30 border-none shadow-none">
+                          {isLinkingNps ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {linkedNps.length === 0 ? (
+                      <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground">
+                        <MessageSquare className="size-8 opacity-20" />
+                        <p className="text-xs italic">Nenhum NPS vinculado.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-2">
+                        {linkedNps.map((n: any) => (
+                          <div key={n.id} className="flex items-center justify-between p-3 bg-background border rounded-xl hover:shadow-md transition-all group overflow-hidden relative">
+                            <div className="flex flex-col min-w-0 mr-16">
+                              <span className="text-sm font-bold truncate block">{n.title}</span>
+                              <span className="text-[10px] text-muted-foreground">{n._count?.invites ?? 0} convites</span>
+                            </div>
+                            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                              {hasPermission('canSendEmails') && (
+                                <Button variant="ghost" size="icon" className="size-8 text-blue-600 hover:bg-blue-50" onClick={() => handleSendNps(n.id)} title="Enviar NPS">
+                                  <Send className="size-3.5" />
+                                </Button>
+                              )}
+                              {hasPermission('canEdit') && (
+                                <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-red-500 hover:bg-red-50" onClick={() => handleUnlinkNps(n.id)} title="Desvincular">
+                                  <X className="size-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -513,7 +653,9 @@ export default function Classes() {
                     <p className="text-xs text-muted-foreground">Status atualizado de progresso nas provas vinculadas.</p>
                   </div>
                   <div className="flex items-center gap-2">
-                     <Badge variant="outline" className="h-6 font-bold bg-muted/50">{students.length} Total</Badge>
+                     <Badge variant="outline" className="h-6 font-bold bg-muted/50">
+                       {activeFilter === 'ALL' ? `${students.length} Total` : `${filteredStudents.length} / ${students.length}`}
+                     </Badge>
                   </div>
                </CardHeader>
                <CardContent className="p-0">
@@ -532,10 +674,10 @@ export default function Classes() {
                       <TableBody>
                         {loadingManage ? (
                            <TableRow><TableCell colSpan={6} className="h-64 text-center"><Loader2 className="size-8 animate-spin mx-auto opacity-20" /></TableCell></TableRow>
-                        ) : students.length === 0 ? (
-                           <TableRow><TableCell colSpan={6} className="h-64 text-center text-muted-foreground">Turma vazia ou sem alunos matriculados.</TableCell></TableRow>
+                        ) : filteredStudents.length === 0 ? (
+                           <TableRow><TableCell colSpan={6} className="h-64 text-center text-muted-foreground">{students.length === 0 ? 'Turma vazia ou sem alunos matriculados.' : 'Nenhum aluno nesta categoria.'}</TableCell></TableRow>
                         ) : (
-                          students.map(s => (
+                          filteredStudents.map(s => (
                             <TableRow key={s.id} className="hover:bg-muted/20 transition-colors border-b last:border-none group">
                               <TableCell className="px-6 py-4">
                                 <Link to={`/admin/students/${s.id}`} className="font-bold text-sm text-primary hover:underline">{s.name}</Link>
@@ -543,16 +685,16 @@ export default function Classes() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  {s.status === 'APROVADO' && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Aprovado</Badge>}
-                                  {s.status === 'REPROVADO' && <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200">Reprovado</Badge>}
-                                  {s.status === 'PENDENTE' && <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100 border-gray-200">Sem Vínculo</Badge>}
-                                  {s.status === 'LIBERADO' && <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">Pendente</Badge>}
+                                  {s.status === 'APPROVED' && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Aprovado</Badge>}
+                                  {s.status === 'REPROVED' && <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200">Reprovado</Badge>}
+                                  {s.status === 'PENDING' && <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100 border-gray-200">Nunca tentou</Badge>}
+                                  {s.status === 'LIBERADO' && <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-purple-200">Liberado</Badge>}
                                   {s.status === 'COOLDOWN' && (
                                     <TooltipProvider>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
                                           <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200 cursor-help gap-1">
-                                            <Clock className="size-3" /> Bloqueado
+                                            <Clock className="size-3" /> Cooldown
                                           </Badge>
                                         </TooltipTrigger>
                                         <TooltipContent>Liberado em: {s.cooldownUntil && new Date(s.cooldownUntil).toLocaleString()}</TooltipContent>
@@ -569,8 +711,8 @@ export default function Classes() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex flex-col">
-                                   <span className="text-xs text-muted-foreground">{s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : 'Nunca'}</span>
-                                   {s.lastActivity && <span className="text-[10px] text-muted-foreground/60">{new Date(s.lastActivity).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>}
+                                   <span className="text-xs text-muted-foreground">{formatActivityDate(s.lastActivity)}</span>
+                                   {formatActivityTime(s.lastActivity) && <span className="text-[10px] text-muted-foreground/60">{formatActivityTime(s.lastActivity)}</span>}
                                 </div>
                               </TableCell>
                               <TableCell className="px-6 text-right">

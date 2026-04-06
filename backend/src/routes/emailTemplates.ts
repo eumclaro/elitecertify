@@ -7,6 +7,17 @@ import { EmailEventKey } from '../constants/emailEvents';
 
 const router = Router();
 
+export const EVENT_MERGE_TAGS: Record<string, string[]> = {
+  STUDENT_CREATED: ['NAME', 'LAST_NAME', 'EMAIL', 'PASSWORD', 'SUPPORT_EMAIL'],
+  AUTH_PASSWORD_RESET: ['NAME', 'LAST_NAME', 'EMAIL', 'RESET_LINK', 'SUPPORT_EMAIL'],
+  EXAM_RELEASED: ['NAME', 'LAST_NAME', 'EMAIL', 'EXAM_NAME', 'SUPPORT_EMAIL'],
+  EXAM_PASSED: ['NAME', 'LAST_NAME', 'EMAIL', 'EXAM_NAME', 'SCORE', 'CORRETAS', 'ERRADAS', 'TOTAL_QUESTOES', 'CERTIFICATE_LINK', 'SUPPORT_EMAIL'],
+  EXAM_FAILED: ['NAME', 'LAST_NAME', 'EMAIL', 'EXAM_NAME', 'SCORE', 'CORRETAS', 'ERRADAS', 'TOTAL_QUESTOES', 'COOLDOWN_DATE', 'COOLDOWN_TIME', 'SUPPORT_EMAIL'],
+  EXAM_ABANDONED: ['NAME', 'LAST_NAME', 'EMAIL', 'EXAM_NAME', 'SUPPORT_EMAIL'],
+  COOLDOWN_RELEASED: ['NAME', 'LAST_NAME', 'EMAIL', 'EXAM_NAME', 'SUPPORT_EMAIL'],
+  CERTIFICATE_SENT: ['NAME', 'EXAM_NAME', 'CERTIFICATE_CODE'],
+};
+
 // GET /api/email-templates
 router.get('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
@@ -148,6 +159,127 @@ router.post('/test', authMiddleware, requireRole('ADMIN'), checkPermission('canC
     return res.json({ message: 'E-mail de teste enviado!', mandrillMsgId: msgId });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Erro ao enviar e-mail de teste' });
+  }
+});
+
+// GET /api/email-templates/merge-tags
+router.get('/merge-tags', authMiddleware, requireRole('ADMIN'), (_req: Request, res: Response) => {
+  return res.json(EVENT_MERGE_TAGS);
+});
+
+// POST /api/email-templates/dispatch
+router.post('/dispatch', authMiddleware, requireRole('ADMIN'), checkPermission('canCreate'), async (req: Request, res: Response) => {
+  try {
+    const { templateId, classId, filter = 'ALL' } = req.body;
+
+    if (!templateId || !classId) {
+      return res.status(400).json({ error: 'templateId e classId são obrigatórios' });
+    }
+
+    const template = await prisma.internalTemplate.findUnique({ where: { id: templateId } });
+    if (!template || !template.htmlContent) {
+      return res.status(404).json({ error: 'Template não encontrado ou sem conteúdo HTML' });
+    }
+
+    // Busca alunos da turma com dados necessários para filtro e substituição
+    const classStudents = await prisma.classStudent.findMany({
+      where: { classId },
+      include: {
+        student: {
+          include: {
+            user: { select: { name: true, email: true } },
+            examAttempts: {
+              where: { executionStatus: 'FINISHED' },
+              orderBy: { finishedAt: 'desc' },
+              take: 1,
+              select: { resultStatus: true }
+            },
+            cooldowns: {
+              where: { status: 'ACTIVE', endsAt: { gt: new Date() } },
+              take: 1
+            }
+          }
+        }
+      }
+    });
+
+    // Aplica filtro
+    const filtered = classStudents.filter(({ student }) => {
+      const latestAttempt = student.examAttempts[0];
+      const hasCooldown = student.cooldowns.length > 0;
+
+      if (filter === 'APPROVED') return latestAttempt?.resultStatus === 'PASSED';
+      if (filter === 'REPROVED') return latestAttempt?.resultStatus === 'FAILED' || latestAttempt?.resultStatus === 'FAILED_TIMEOUT';
+      if (filter === 'PENDING') return !latestAttempt;
+      if (filter === 'COOLDOWN') return hasCooldown;
+      return true; // ALL
+    });
+
+    const { fromEmail, fromName } = await getAuthorizedSender();
+    const provider = getEmailProvider();
+    const supportEmail = 'suporte@elitetraining.com.br';
+
+    let sent = 0;
+    let failed = 0;
+    const BATCH_SIZE = 10;
+
+    for (let i = 0; i < filtered.length; i += BATCH_SIZE) {
+      const batch = filtered.slice(i, i + BATCH_SIZE);
+
+      await Promise.all(batch.map(async ({ student }) => {
+        try {
+          const name = student.user.name;
+          const lastName = student.lastName || '';
+          const email = student.user.email;
+
+          let html = template.htmlContent!;
+          const vars: Record<string, string> = { NAME: name, LAST_NAME: lastName, EMAIL: email, SUPPORT_EMAIL: supportEmail };
+          Object.entries(vars).forEach(([key, val]) => {
+            html = html.replace(new RegExp(`{{${key}}}`, 'g'), val);
+          });
+
+          await provider.send({
+            toEmail: email,
+            toName: name,
+            eventKey: 'MANUAL_BLAST' as EmailEventKey,
+            subject: template.name,
+            dynamicData: vars,
+            fromEmail,
+            fromName,
+            htmlContent: html,
+          });
+
+          await prisma.emailLog.create({
+            data: {
+              eventKey: 'MANUAL_BLAST',
+              templateUsed: template.name,
+              recipient: email,
+              subject: template.name,
+              payloadJson: JSON.stringify(vars),
+              provider: 'MANDRILL',
+              status: 'SENT',
+              sentAt: new Date(),
+              studentId: student.id,
+            }
+          });
+
+          sent++;
+        } catch (err: any) {
+          console.error(`[Dispatch] Falha para ${student.user.email}:`, err.message);
+          failed++;
+        }
+      }));
+
+      // Delay entre lotes (exceto no último)
+      if (i + BATCH_SIZE < filtered.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    return res.json({ total: filtered.length, sent, failed });
+  } catch (error: any) {
+    console.error('[Dispatch] Error:', error);
+    return res.status(500).json({ error: 'Erro ao processar disparo em massa' });
   }
 });
 

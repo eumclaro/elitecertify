@@ -165,6 +165,7 @@ export default function EmailManagement() {
   const [bindings, setBindings] = useState<EmailBinding[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('templates');
+  const [mergeTags, setMergeTags] = useState<Record<string, string[]>>({});
 
   // Modal: Create/Edit Template
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -194,6 +195,7 @@ export default function EmailManagement() {
 
   useEffect(() => {
     fetchData();
+    api.get('/email-templates/merge-tags').then(r => setMergeTags(r.data)).catch(() => {});
   }, []);
 
   const fetchData = async () => {
@@ -511,20 +513,33 @@ export default function EmailManagement() {
 
             <div className="space-y-3">
               <Label className="flex items-center gap-2">
-                Merge Tags Disponíveis 
+                Merge Tags Disponíveis
                 <span className="text-[10px] font-normal text-muted-foreground uppercase">(Clique para inserir)</span>
               </Label>
               <div className="flex flex-wrap gap-1.5 p-3 bg-muted/30 rounded-lg border border-dashed">
-                {MERGE_TAGS.map(item => (
-                  <button 
-                    key={item.tag} 
-                    onClick={() => insertMergeTag(item.tag)}
-                    className="px-2 py-1 bg-background border rounded-md text-[10px] font-bold hover:bg-primary hover:text-primary-foreground transition-all uppercase"
-                  >
-                    {item.tag}
-                  </button>
-                ))}
+                {(() => {
+                  const binding = bindings.find(b => b.internalTemplateId === editingTemplate?.id);
+                  const eventKey = binding?.eventKey;
+                  const tags = eventKey && mergeTags[eventKey]
+                    ? mergeTags[eventKey]
+                    : Object.values(mergeTags).flat().filter((v, i, a) => a.indexOf(v) === i);
+                  return tags.map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => insertMergeTag(tag)}
+                      className="px-2 py-1 bg-background border rounded-md text-[10px] font-bold hover:bg-primary hover:text-primary-foreground transition-all uppercase"
+                    >
+                      {tag}
+                    </button>
+                  ));
+                })()}
               </div>
+              {(() => {
+                const binding = bindings.find(b => b.internalTemplateId === editingTemplate?.id);
+                return binding?.eventKey
+                  ? <p className="text-[10px] text-muted-foreground">Tags filtradas para o evento <code className="font-bold text-orange-600">{binding.eventKey}</code></p>
+                  : <p className="text-[10px] text-muted-foreground">Template sem vínculo de evento — exibindo todas as tags disponíveis.</p>;
+              })()}
             </div>
 
             <div className="space-y-2 flex-1 flex flex-col min-h-[400px]">

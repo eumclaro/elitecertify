@@ -43,7 +43,8 @@ import {
   ArrowUpRight,
   FileJson,
   Unlock,
-  Send
+  Send,
+  UserMinus
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -403,7 +404,7 @@ export default function Classes() {
              )}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
             <Card className="bg-blue-50/50 border-blue-100 shadow-sm">
               <CardContent className="p-4 pt-4 flex items-center gap-4">
                 <div className="p-2 bg-blue-500/10 text-blue-600 rounded-lg shadow-inner"><Users className="size-5" /></div>
@@ -432,6 +433,12 @@ export default function Classes() {
               <CardContent className="p-4 pt-4 flex items-center gap-4">
                 <div className="p-2 bg-purple-500/10 text-purple-600 rounded-lg shadow-inner"><Target className="size-5" /></div>
                 <div><p className="text-[10px] text-purple-600 uppercase font-black tracking-wider">Liberado</p><p className="text-2xl font-black text-purple-700">{metrics?.released || 0}</p></div>
+              </CardContent>
+            </Card>
+            <Card className="bg-slate-50/50 border-slate-100 shadow-sm">
+              <CardContent className="p-4 pt-4 flex items-center gap-4">
+                <div className="p-2 bg-slate-500/10 text-slate-600 rounded-lg shadow-inner"><UserMinus className="size-5" /></div>
+                <div><p className="text-[10px] text-slate-600 uppercase font-black tracking-wider">Nunca tentou</p><p className="text-2xl font-black text-slate-700">{metrics?.pending || 0}</p></div>
               </CardContent>
             </Card>
           </div>

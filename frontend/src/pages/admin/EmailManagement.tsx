@@ -135,19 +135,6 @@ const DEFAULT_MOCK_DATA = {
   SUPPORT_EMAIL: 'suporte@elitetraining.com.br',
 };
 
-const MERGE_TAGS = [
-  { tag: 'NAME', label: 'Nome' },
-  { tag: 'EMAIL', label: 'E-mail' },
-  { tag: 'PASSWORD', label: 'Senha' },
-  { tag: 'EXAM_NAME', label: 'Nome da Prova' },
-  { tag: 'SCORE', label: 'Nota/Pontuação' },
-  { tag: 'RESULT_LINK', label: 'Link do Resultado' },
-  { tag: 'COOLDOWN_DATE', label: 'Data do Cooldown' },
-  { tag: 'COOLDOWN_TIME', label: 'Hora do Cooldown' },
-  { tag: 'CERTIFICATE_LINK', label: 'Link do Certificado' },
-  { tag: 'SUPPORT_EMAIL', label: 'E-mail de Suporte' },
-  { tag: 'RESET_LINK', label: 'Link de Reset de Senha' }
-];
 
 const EVENT_KEYS = [
   'STUDENT_CREATED',

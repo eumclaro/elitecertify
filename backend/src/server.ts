@@ -72,13 +72,16 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/certificate-templates', certificateTemplatesRoutes);
 
-// Static assets
-const systemAssetsPath = path.join(__dirname, 'assets/system');
+// Static assets — anchored to process.cwd() (/app in Docker) so paths are
+// consistent between multer storage destinations and express.static serving
+const assetsRoot = process.cwd();
+const systemAssetsPath = path.join(assetsRoot, 'assets/system');
 if (!fs.existsSync(systemAssetsPath)) {
   fs.mkdirSync(systemAssetsPath, { recursive: true });
 }
-app.use('/assets/system', express.static(systemAssetsPath));
-app.use('/uploads/certificates', express.static(path.join(__dirname, 'assets/certificates')));
+app.use('/assets/system',        express.static(path.join(assetsRoot, 'assets/system')));
+app.use('/assets/avatars',       express.static(path.join(assetsRoot, 'assets/avatars')));
+app.use('/uploads/certificates', express.static(path.join(assetsRoot, 'assets/certificates')));
 
 // 404
 app.use((_req, res) => {

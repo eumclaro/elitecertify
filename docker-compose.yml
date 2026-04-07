@@ -10,6 +10,8 @@ services:
       - FRONTEND_URL=${FRONTEND_URL}
       - PORT=3333
       - NODE_ENV=production
+    volumes:
+      - assets_data:/app/assets
     networks:
       - app
       - coolify
@@ -31,3 +33,6 @@ networks:
     driver: bridge
   coolify:
     external: true
+
+volumes:
+  assets_data:

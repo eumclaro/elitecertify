@@ -39,12 +39,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Users, 
-  Search, 
-  Plus, 
-  Trash2, 
-  Mail, 
+import {
+  Users,
+  Search,
+  Plus,
+  Trash2,
+  Mail,
   School,
   ShieldCheck,
   Download,
@@ -57,7 +57,8 @@ import {
   Lock,
   Eye,
   EyeOff,
-  AlertTriangle
+  AlertTriangle,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -137,6 +138,13 @@ export default function Students() {
   // State for missing template warning
   const [showNoTemplateDialog, setShowNoTemplateDialog] = useState(false);
 
+  // NPS modal state
+  const [showNpsModal, setShowNpsModal] = useState(false);
+  const [npsStudent, setNpsStudent] = useState<Student | null>(null);
+  const [npsSurveys, setNpsSurveys] = useState<any[]>([]);
+  const [selectedNpsSurveyId, setSelectedNpsSurveyId] = useState('');
+  const [sendingNps, setSendingNps] = useState(false);
+
   const loadStudents = async (page = 1) => {
     setLoading(true);
     try {
@@ -149,6 +157,30 @@ export default function Students() {
 
   const loadClasses = async () => {
     try { const res = await api.get('/classes'); setClasses(res.data); } catch {}
+  };
+
+  const openNpsModal = async (s: Student) => {
+    setNpsStudent(s);
+    setSelectedNpsSurveyId('');
+    try {
+      const { data } = await api.get('/nps/surveys');
+      setNpsSurveys(data.filter((sv: any) => sv.status === 'ACTIVE'));
+    } catch { setNpsSurveys([]); }
+    setShowNpsModal(true);
+  };
+
+  const sendNpsInvite = async () => {
+    if (!npsStudent || !selectedNpsSurveyId) return;
+    setSendingNps(true);
+    try {
+      await api.post(`/nps/surveys/${selectedNpsSurveyId}/send-individual`, { studentId: npsStudent.id });
+      toast.success('Convite NPS enviado com sucesso!');
+      setShowNpsModal(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Erro ao enviar convite NPS');
+    } finally {
+      setSendingNps(false);
+    }
   };
 
   useEffect(() => { loadClasses(); }, []);
@@ -434,6 +466,12 @@ export default function Students() {
                             {hasPermission('canSendEmails') && (
                               <DropdownMenuItem onClick={() => setConfirmResend(s)}>
                                 <Mail className="mr-2 size-4" /> Reenviar Acesso
+                              </DropdownMenuItem>
+                            )}
+
+                            {hasPermission('canEdit') && (
+                              <DropdownMenuItem onClick={() => openNpsModal(s)}>
+                                <Send className="mr-2 size-4" /> Enviar NPS
                               </DropdownMenuItem>
                             )}
 
@@ -951,6 +989,52 @@ export default function Students() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Modal Enviar NPS */}
+      <Dialog open={showNpsModal} onOpenChange={setShowNpsModal}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="size-5 text-primary" /> Enviar NPS
+            </DialogTitle>
+            <DialogDescription>
+              Selecione a pesquisa ativa para enviar a <strong>{npsStudent?.user.name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          {npsSurveys.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">Nenhuma pesquisa NPS ativa no momento.</p>
+          ) : (
+            <div className="space-y-2 py-2">
+              {npsSurveys.map((sv: any) => (
+                <label
+                  key={sv.id}
+                  className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${selectedNpsSurveyId === sv.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/30'}`}
+                >
+                  <input
+                    type="radio"
+                    name="nps-survey"
+                    value={sv.id}
+                    checked={selectedNpsSurveyId === sv.id}
+                    onChange={() => setSelectedNpsSurveyId(sv.id)}
+                    className="accent-primary"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold">{sv.title}</p>
+                    <p className="text-xs text-muted-foreground">{sv.class?.name ?? 'Global'}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowNpsModal(false)} disabled={sendingNps}>Cancelar</Button>
+            <Button onClick={sendNpsInvite} disabled={!selectedNpsSurveyId || sendingNps}>
+              {sendingNps ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Send className="mr-2 size-4" />}
+              Enviar Convite
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal de Alerta de Template Não Configurado */}
       <Dialog open={showNoTemplateDialog} onOpenChange={setShowNoTemplateDialog}>
         <DialogContent className="sm:max-w-[400px]">

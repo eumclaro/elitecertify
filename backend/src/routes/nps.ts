@@ -107,7 +107,8 @@ router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), checkPermission
 
     // Update questions if provided
     if (questions && Array.isArray(questions)) {
-      for (const q of questions) {
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
         if (q.id && q.text) {
           await prisma.npsQuestion.update({
             where: { id: q.id },
@@ -115,6 +116,17 @@ router.put('/surveys/:id', authMiddleware, requireRole('ADMIN'), checkPermission
               text: q.text,
               ...(q.type && { type: q.type }),
               ...(q.options !== undefined && { options: q.options || null }),
+              order: i,
+            },
+          });
+        } else if (!q.id && q.text?.trim()) {
+          await prisma.npsQuestion.create({
+            data: {
+              surveyId,
+              text: q.text.trim(),
+              type: q.type || 'TEXT',
+              options: q.options || null,
+              order: i,
             },
           });
         }

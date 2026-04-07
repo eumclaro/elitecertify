@@ -19,9 +19,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Plus, 
-  Trash2, 
+import {
+  Plus,
+  Trash2,
   Loader2,
   BarChart3,
   Send,
@@ -38,7 +38,8 @@ import {
   HelpCircle,
   Search,
   ListOrdered,
-  Save
+  Save,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,6 +88,10 @@ export default function NpsSurveys() {
   const [feedbackSearch, setFeedbackSearch] = useState('');
   const [editableQuestions, setEditableQuestions] = useState<any[]>([]);
   const [savingQuestions, setSavingQuestions] = useState(false);
+  const [externalSearch, setExternalSearch] = useState('');
+  const [externalResults, setExternalResults] = useState<any[]>([]);
+  const [searchingExternal, setSearchingExternal] = useState(false);
+  const [sendingExternalId, setSendingExternalId] = useState<string | null>(null);
 
   const fetchSurveys = async () => {
     try {
@@ -177,7 +182,9 @@ export default function NpsSurveys() {
     try {
       const { data } = await api.get(`/nps/surveys/${id}/results`);
       setSelectedSurvey(data);
-      setEditableQuestions(data.questions?.map((q: any) => ({ ...q })) || []);
+      setEditableQuestions(data.questions?.map((q: any) => ({ ...q, _key: q.id })) || []);
+      setExternalSearch('');
+      setExternalResults([]);
     } catch (err) { 
       console.error(err); 
       toast.error("Erro ao carregar resultados");
@@ -195,6 +202,42 @@ export default function NpsSurveys() {
     } catch (err) {
       toast.error("Erro ao excluir pesquisa");
     }
+  };
+
+  const searchExternalStudents = async (q: string) => {
+    setExternalSearch(q);
+    if (!q.trim()) { setExternalResults([]); return; }
+    setSearchingExternal(true);
+    try {
+      const { data } = await api.get('/students', { params: { search: q, limit: 8 } });
+      setExternalResults(data.data || []);
+    } catch { /* silent */ } finally { setSearchingExternal(false); }
+  };
+
+  const sendExternalInvite = async (studentId: string) => {
+    if (!selectedSurvey) return;
+    setSendingExternalId(studentId);
+    try {
+      await api.post(`/nps/surveys/${selectedSurvey.survey.id}/send-individual`, { studentId });
+      toast.success('Convite enviado!');
+      setExternalSearch('');
+      setExternalResults([]);
+      viewResults(selectedSurvey.survey.id);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Erro ao enviar convite');
+    } finally {
+      setSendingExternalId(null);
+    }
+  };
+
+  const addEditableQuestion = () => {
+    setEditableQuestions(prev => [...prev, {
+      _key: `new-${Date.now()}`,
+      id: null,
+      text: '',
+      type: 'TEXT',
+      options: null,
+    }]);
   };
 
   const addQuestion = () => setForm(f => ({ ...f, questions: [...f.questions, { text: '', type: 'SCORE', options: '' }] }));
@@ -451,6 +494,44 @@ export default function NpsSurveys() {
                 </Button>
               )}
             </div>
+
+            <Card className="border-none shadow-sm">
+              <CardContent className="p-4 space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Convidar aluno individualmente</p>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar aluno por nome ou e-mail..."
+                    value={externalSearch}
+                    onChange={e => searchExternalStudents(e.target.value)}
+                    className="pl-8 h-9 text-sm"
+                  />
+                  {searchingExternal && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 size-3.5 animate-spin text-muted-foreground" />}
+                </div>
+                {externalResults.length > 0 && (
+                  <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+                    {externalResults.map((st: any) => (
+                      <div key={st.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted/30">
+                        <div>
+                          <p className="text-sm font-semibold">{st.user?.name}</p>
+                          <p className="text-xs text-muted-foreground">{st.user?.email}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 text-[11px] font-bold uppercase tracking-wider gap-1"
+                          onClick={() => sendExternalInvite(st.id)}
+                          disabled={sendingExternalId === st.id}
+                        >
+                          {sendingExternalId === st.id ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
+                          Convidar
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
             
             <Card className="border-none shadow-sm overflow-hidden">
                <Table>
@@ -512,38 +593,49 @@ export default function NpsSurveys() {
                 <ListOrdered className="size-5 text-primary" /> Perguntas da Pesquisa
               </h2>
               {s.stats.totalResponses === 0 && (
-                <Button
-                  size="sm"
-                  className="gap-2 font-bold h-9"
-                  disabled={savingQuestions}
-                  onClick={async () => {
-                    setSavingQuestions(true);
-                    try {
-                      await api.put(`/nps/surveys/${s.survey.id}`, {
-                        questions: editableQuestions.map((q: any) => ({
-                          id: q.id,
-                          text: q.text,
-                          type: q.type,
-                          options: q.options,
-                        })),
-                      });
-                      toast.success('Perguntas atualizadas com sucesso!');
-                      viewResults(s.survey.id);
-                    } catch (err: any) {
-                      if (err.response?.status === 403) {
-                        toast.error(err.response.data.error);
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2 font-bold h-9"
+                    onClick={addEditableQuestion}
+                    disabled={savingQuestions}
+                  >
+                    <Plus className="size-4" /> Pergunta
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-2 font-bold h-9"
+                    disabled={savingQuestions}
+                    onClick={async () => {
+                      setSavingQuestions(true);
+                      try {
+                        await api.put(`/nps/surveys/${s.survey.id}`, {
+                          questions: editableQuestions.map((q: any) => ({
+                            ...(q.id ? { id: q.id } : {}),
+                            text: q.text,
+                            type: q.type,
+                            options: q.options,
+                          })),
+                        });
+                        toast.success('Perguntas atualizadas com sucesso!');
                         viewResults(s.survey.id);
-                      } else {
-                        toast.error('Erro ao salvar perguntas');
+                      } catch (err: any) {
+                        if (err.response?.status === 403) {
+                          toast.error(err.response.data.error);
+                          viewResults(s.survey.id);
+                        } else {
+                          toast.error('Erro ao salvar perguntas');
+                        }
+                      } finally {
+                        setSavingQuestions(false);
                       }
-                    } finally {
-                      setSavingQuestions(false);
-                    }
-                  }}
-                >
-                  {savingQuestions ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                  Salvar Alterações
-                </Button>
+                    }}
+                  >
+                    {savingQuestions ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                    Salvar Alterações
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -558,7 +650,7 @@ export default function NpsSurveys() {
 
             <div className="space-y-4">
               {(s.stats.totalResponses > 0 ? s.questions : editableQuestions).map((q: any, idx: number) => (
-                <Card key={q.id} className="border-none shadow-sm overflow-hidden">
+                <Card key={q._key ?? q.id ?? idx} className="border-none shadow-sm overflow-hidden">
                   <CardContent className="p-5">
                     <div className="flex items-start gap-4">
                       <div className="flex-shrink-0 size-8 rounded-full bg-muted flex items-center justify-center text-xs font-black text-muted-foreground">
@@ -568,22 +660,61 @@ export default function NpsSurveys() {
                         {s.stats.totalResponses > 0 ? (
                           <p className="text-sm font-semibold leading-relaxed pt-1">{q.text}</p>
                         ) : (
-                          <Input
-                            value={q.text}
-                            onChange={e => {
-                              setEditableQuestions(prev =>
-                                prev.map((p: any) => p.id === q.id ? { ...p, text: e.target.value } : p)
-                              );
-                            }}
-                            className="font-medium"
-                          />
+                          <div className="flex gap-2">
+                            <Input
+                              value={q.text}
+                              placeholder="Texto da pergunta..."
+                              onChange={e => {
+                                const key = q._key;
+                                setEditableQuestions(prev =>
+                                  prev.map((p: any) => p._key === key ? { ...p, text: e.target.value } : p)
+                                );
+                              }}
+                              className="font-medium"
+                            />
+                            {!q.id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => {
+                                  const key = q._key;
+                                  setEditableQuestions(prev => prev.filter((p: any) => p._key !== key));
+                                }}
+                              >
+                                <X className="size-4" />
+                              </Button>
+                            )}
+                          </div>
                         )}
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider">
-                            {q.type === 'SCORE' ? 'Régua 0–10 (NPS)' :
-                             q.type === 'RATING_5' ? 'Escala 1–5 (Estrelas)' :
-                             q.type === 'MULTIPLE_CHOICE' ? 'Múltipla Escolha' : 'Texto Aberto'}
-                          </Badge>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {s.stats.totalResponses === 0 && !q.id ? (
+                            <Select
+                              value={q.type}
+                              onValueChange={val => {
+                                const key = q._key;
+                                setEditableQuestions(prev =>
+                                  prev.map((p: any) => p._key === key ? { ...p, type: val } : p)
+                                );
+                              }}
+                            >
+                              <SelectTrigger className="h-7 text-[11px] w-44">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="SCORE">Régua 0–10 (NPS)</SelectItem>
+                                <SelectItem value="RATING_5">Escala 1–5 (Estrelas)</SelectItem>
+                                <SelectItem value="MULTIPLE_CHOICE">Múltipla Escolha</SelectItem>
+                                <SelectItem value="TEXT">Texto Aberto</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider">
+                              {q.type === 'SCORE' ? 'Régua 0–10 (NPS)' :
+                               q.type === 'RATING_5' ? 'Escala 1–5 (Estrelas)' :
+                               q.type === 'MULTIPLE_CHOICE' ? 'Múltipla Escolha' : 'Texto Aberto'}
+                            </Badge>
+                          )}
                           {q.type === 'MULTIPLE_CHOICE' && q.options && (
                             <span className="text-[10px] text-muted-foreground italic">
                               Opções: {q.options}

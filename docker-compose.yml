@@ -23,6 +23,7 @@ services:
       - "traefik.enable=false"
     networks:
       - app
+      - coolify
     restart: unless-stopped
 
   frontend:

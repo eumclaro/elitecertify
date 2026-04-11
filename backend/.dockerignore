@@ -1,0 +1,17 @@
+node_modules
+dist
+.env
+*.log
+*.txt
+check*.ts
+debug*.ts
+diagnose*.ts
+test*.ts
+test*.js
+tmp-*.ts
+*.pdf
+*.png
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json

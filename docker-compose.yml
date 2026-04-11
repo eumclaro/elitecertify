@@ -8,8 +8,15 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - MANDRILL_API_KEY=${MANDRILL_API_KEY}
       - FRONTEND_URL=${FRONTEND_URL}
+      - PRODUCTION_URL=${PRODUCTION_URL}
       - PORT=3333
       - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3333/api/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
     volumes:
       - assets_data:/app/assets
     labels:
@@ -23,7 +30,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     labels:
       - "traefik.docker.network=coolify"
     networks:

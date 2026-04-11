@@ -271,7 +271,7 @@ router.post('/:id/releases', authMiddleware, requireRole('ADMIN'), checkPermissi
     // DISPARO DE E-MAIL EM LOTE OU INDIVIDUAL (Síncrono para retornar ok, mas async por baixo)
     const rel = release as any;
     if (studentId && rel.student) {
-      sendExamReleasedEmail(rel.student.user.name, rel.student.user.email, rel.exam.title, rel.student.lastName || '').catch(() => {});
+      sendExamReleasedEmail(rel.student.user.name, rel.student.user.email, rel.exam.title, rel.student.lastName || '', rel.student.id).catch(() => {});
     } else if (classId) {
       // Find all students in this class
       prisma.classStudent.findMany({
@@ -281,7 +281,7 @@ router.post('/:id/releases', authMiddleware, requireRole('ADMIN'), checkPermissi
         for (const cs of classStudents) {
           const student = cs.student as any;
           if (student.user.email) {
-            sendExamReleasedEmail(student.user.name, student.user.email, rel.exam.title, student.lastName || '').catch(() => {});
+            sendExamReleasedEmail(student.user.name, student.user.email, rel.exam.title, student.lastName || '', student.id).catch(() => {});
           }
         }
       });
@@ -342,7 +342,7 @@ router.put('/cooldowns/:id/clear', authMiddleware, requireRole('ADMIN'), checkPe
 
     // Enviar aviso
     const upd = updated as any;
-    sendCooldownReleasedEmail(upd.student.user.name, upd.student.user.email, upd.exam.title, upd.student.lastName || '').catch(() => {});
+    sendCooldownReleasedEmail(upd.student.user.name, upd.student.user.email, upd.exam.title, upd.student.lastName || '', upd.student.id).catch(() => {});
 
     return res.json({ message: 'Cooldown liberado com sucesso' });
   } catch (error) {

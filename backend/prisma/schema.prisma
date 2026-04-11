@@ -53,6 +53,7 @@ model Student {
   eventInterests EventInterest[]
   eventReferrals EventReferral[]
   loginLogs      StudentLoginLog[]
+  emailLogs      EmailLog[]
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("students")
@@ -356,10 +357,13 @@ model EmailLog {
   dispatchId    String?   @map("dispatch_id")
   dispatch        Dispatch? @relation(fields: [dispatchId], references: [id])
   certificateCode String?   @map("certificate_code")
+  studentId       String?   @map("student_id")
+  student         Student?  @relation(fields: [studentId], references: [id])
 
   @@index([mandrillMsgId])
   @@index([recipient])
   @@index([eventKey])
+  @@index([studentId])
   @@map("email_logs")
 }
 

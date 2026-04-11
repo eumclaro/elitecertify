@@ -95,6 +95,10 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
 </html>
 `
 
+  if (process.env.DISABLE_PUPPETEER === 'true') {
+    throw new Error('Geração de PDF temporariamente desativada para manutenção de performance.');
+  }
+
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('PDF generation timeout')), 20000)
   )

@@ -482,6 +482,11 @@ router.get('/export/pdf', authMiddleware, requireRole('ADMIN'), async (req: Requ
   try {
     const type = qs(req.query.type);
     const id = qs(req.query.id);
+
+    if (process.env.DISABLE_PUPPETEER === 'true') {
+      return res.status(503).json({ error: 'Exportação de PDF temporariamente desativada.' });
+    }
+
     let title = 'Relatório Geral';
     let rows: any[] = [];
     let headers: string[] = [];

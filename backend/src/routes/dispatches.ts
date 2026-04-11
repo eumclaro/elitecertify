@@ -215,8 +215,11 @@ router.post('/', authMiddleware, requireRole('ADMIN'), checkPermission('canSendE
             student.user.email,
             student.user.name,
             dynamicData,
-            undefined, // Use default subject from template if needed
-            dispatch.id // <--- Passar o ID do dispatch
+            undefined, // subject
+            dispatch.id, // dispatchId
+            undefined, // attachment
+            undefined, // certificateCode
+            student.id // studentId
           );
           
           results.success++;

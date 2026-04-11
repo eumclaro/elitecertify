@@ -97,16 +97,10 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Erro interno do servidor' });
 });
 
-// Robust async startup with DB connection test and graceful shutdown
+// Robust async startup — listen FIRST (so Docker healthcheck passes),
+// then test DB connection in background
 async function startServer() {
   try {
-    // Import prisma here to test DB connection at startup
-    const prisma = (await import('./config/database')).default;
-
-    console.log('Testing database connection...');
-    await prisma.$connect();
-    console.log('✅ Database connection successful.');
-
     const server = app.listen(env.PORT, '0.0.0.0', () => {
       console.log(`🚀 Elite Certify API running on port ${env.PORT}`);
       console.log(`📚 Environment: ${env.NODE_ENV}`);
@@ -115,15 +109,27 @@ async function startServer() {
       console.log(`🔒 DATABASE_URL: ${env.DATABASE_URL ? '***set***' : '⚠️ MISSING!'}`);
     });
 
+    // Test DB connection AFTER listening (non-blocking for healthcheck)
+    try {
+      const prisma = (await import('./config/database')).default;
+      console.log('Testing database connection...');
+      await prisma.$connect();
+      console.log('✅ Database connection successful.');
+    } catch (dbError) {
+      console.error('⚠️ Database connection failed at startup (will retry on first request):', dbError);
+    }
+
     // Graceful shutdown
     const shutdown = async (signal: string) => {
       console.log(`\n${signal} received. Shutting down gracefully...`);
       server.close(async () => {
-        await prisma.$disconnect();
+        try {
+          const prisma = (await import('./config/database')).default;
+          await prisma.$disconnect();
+        } catch { /* ignore */ }
         console.log('Server closed.');
         process.exit(0);
       });
-      // Force exit after 10s if graceful shutdown fails
       setTimeout(() => process.exit(1), 10000);
     };
 

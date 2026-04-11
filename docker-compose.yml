@@ -13,10 +13,10 @@ services:
       - NODE_ENV=production
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3333/api/health"]
-      interval: 10s
-      timeout: 5s
-      start_period: 30s
-      retries: 5
+      interval: 15s
+      timeout: 10s
+      start_period: 60s
+      retries: 10
     volumes:
       - assets_data:/app/assets
     labels:
@@ -30,8 +30,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     labels:
       - "traefik.docker.network=coolify"
     networks:

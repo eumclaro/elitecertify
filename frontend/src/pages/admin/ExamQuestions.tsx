@@ -1,6 +1,39 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from 'sonner';
+import {
+  ArrowLeft,
+  Plus,
+  Upload,
+  ArrowUp,
+  ArrowDown,
+  Edit2,
+  Trash2,
+  Loader2,
+  CheckCircle2,
+  FileText,
+} from 'lucide-react';
 
 interface Alternative {
   id?: string;
@@ -30,9 +63,11 @@ export default function ExamQuestions() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Question | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [deleteModalItem, setDeleteModalItem] = useState<Question | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -106,30 +141,29 @@ export default function ExamQuestions() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     let payloadAlts: any = [];
-    
+
     if (formType !== 'ESSAY') {
       const altsFiltered = formAlts.filter(a => a.text.trim());
-      if (altsFiltered.length < 2) { alert('Mínimo 2 alternativas'); return; }
-      if (!altsFiltered.some(a => a.isCorrect)) { alert('Marque pelo menos uma alternativa correta'); return; }
+      if (altsFiltered.length < 2) { toast.error('Mínimo 2 alternativas'); return; }
+      if (!altsFiltered.some(a => a.isCorrect)) { toast.error('Marque pelo menos uma alternativa correta'); return; }
       payloadAlts = altsFiltered.map((a, i) => ({ text: a.text, isCorrect: a.isCorrect, order: i + 1 }));
     }
 
+    setSaving(true);
     try {
       if (editing) {
-        await api.put(`/exams/${examId}/questions/${editing.id}`, {
-          text: formText, type: formType,
-          alternatives: payloadAlts,
-        });
+        await api.put(`/exams/${examId}/questions/${editing.id}`, { text: formText, type: formType, alternatives: payloadAlts });
+        toast.success('Questão atualizada com sucesso!');
       } else {
-        await api.post(`/exams/${examId}/questions`, {
-          text: formText, type: formType,
-          alternatives: payloadAlts,
-        });
+        await api.post(`/exams/${examId}/questions`, { text: formText, type: formType, alternatives: payloadAlts });
+        toast.success('Questão criada com sucesso!');
       }
       setShowModal(false);
       loadData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao salvar questão');
+      toast.error(err.response?.data?.error || 'Erro ao salvar questão');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -140,12 +174,16 @@ export default function ExamQuestions() {
 
   const confirmDelete = async () => {
     if (!deleteModalItem || deleteConfirmText !== 'EXCLUIR') return;
+    setDeleting(true);
     try {
       await api.delete(`/exams/${examId}/questions/${deleteModalItem.id}`);
+      toast.success('Questão excluída.');
       setDeleteModalItem(null);
       loadData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao excluir questão');
+      toast.error(err.response?.data?.error || 'Erro ao excluir questão');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -155,13 +193,9 @@ export default function ExamQuestions() {
 
     const newQuestions = [...questions];
     const targetIndex = direction === 'UP' ? index - 1 : index + 1;
-
-    // Swap
     const temp = newQuestions[index];
     newQuestions[index] = newQuestions[targetIndex];
     newQuestions[targetIndex] = temp;
-
-    // Update orders locally
     newQuestions.forEach((q, i) => { q.order = i + 1; });
     setQuestions(newQuestions);
 
@@ -169,16 +203,16 @@ export default function ExamQuestions() {
       const orders = newQuestions.map(q => ({ id: q.id, order: q.order }));
       await api.post(`/exams/${examId}/questions/reorder`, { orders });
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao reorganizar questões');
-      loadData(); // Revert on failure
+      toast.error(err.response?.data?.error || 'Erro ao reorganizar questões');
+      loadData();
     }
   };
 
   const downloadTemplate = () => {
     const csv = 'texto_questao;tipo;alternativa_A;correta_A;alternativa_B;correta_B;alternativa_C;correta_C;alternativa_D;correta_D;alternativa_E;correta_E\n' +
-                'Qual é a capital do Brasil?;SINGLE_CHOICE;Brasília;S;Buenos Aires;N;Rio de Janeiro;N;São Paulo;N;;\n' +
-                'Descreva suas motivações para aprender TS.;ESSAY;;;;;;;;;;';
-    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8' }); // UTF-8 BOM para Excel
+      'Qual é a capital do Brasil?;SINGLE_CHOICE;Brasília;S;Buenos Aires;N;Rio de Janeiro;N;São Paulo;N;;\n' +
+      'Descreva suas motivações para aprender TS.;ESSAY;;;;;;;;;;';
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -191,10 +225,10 @@ export default function ExamQuestions() {
     if (!importFile) return;
     setImporting(true);
     setImportErrors([]);
-    
+
     const formData = new FormData();
     formData.append('file', importFile);
-    
+
     try {
       const res = await api.post(`/exams/${examId}/questions/import`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -214,218 +248,254 @@ export default function ExamQuestions() {
     }
   };
 
-  if (loading) return <div className="page-loading"><div className="spinner"></div></div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
-    <div className="crud-page">
-      <div className="page-header">
-        <div>
-          <Link to="/admin/exams" className="back-link">← Voltar para Provas</Link>
-          <h2>Questões: {exam?.title}</h2>
-          <p>{questions.length}/{exam?.questionCount} questão(ões)</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="space-y-1">
+          <Link to="/admin/exams" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit">
+            <ArrowLeft className="w-4 h-4" /> Voltar para Provas
+          </Link>
+          <h2 className="text-2xl font-bold tracking-tight">{exam?.title}</h2>
+          <p className="text-sm text-muted-foreground">{questions.length} questão(ões) cadastrada(s)</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button className="btn btn-outline" onClick={() => { setShowImportModal(true); setImportErrors([]); setImportFile(null); }}>
-            📥 Importar CSV
-          </button>
-          <button className="btn btn-primary" onClick={openCreate}>+ Nova Questão</button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setShowImportModal(true); setImportErrors([]); setImportFile(null); }}>
+            <Upload className="w-4 h-4 mr-2" /> Importar CSV
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="w-4 h-4 mr-2" /> Nova Questão
+          </Button>
         </div>
       </div>
 
-      {/* Question Cards */}
-      <div className="questions-list">
-        {questions.length === 0 ? (
-          <div className="empty-card">
-            <p>📝 Nenhuma questão cadastrada. Clique em "+ Nova Questão" para começar.</p>
-          </div>
-        ) : questions.map((q, i) => (
-          <div key={q.id} className="question-card">
-            <div className="question-header">
-              <span className="question-number">Questão {i + 1}</span>
-              <div className="actions" style={{ display: 'flex', gap: '5px' }}>
-                <button className="btn btn-sm btn-outline" disabled={i === 0} onClick={() => moveQuestion(i, 'UP')} title="Mover para cima">↑</button>
-                <button className="btn btn-sm btn-outline" disabled={i === questions.length - 1} onClick={() => moveQuestion(i, 'DOWN')} title="Mover para baixo">↓</button>
-                <div style={{ width: '10px' }}></div> {/* Spacer */}
-                <button className="btn btn-sm btn-outline" onClick={() => openEdit(q)}>Editar</button>
-                <button className="btn btn-sm btn-danger" onClick={() => openDelete(q)}>Excluir</button>
-              </div>
-            </div>
-            <p className="question-text">{q.text}</p>
-            <div className="alternatives-list">
-              {q.type === 'ESSAY' ? (
-                <div className="alternative-item"><span className="alt-text" style={{ fontStyle: 'italic', color: '#9ca3af' }}>Questão Dissertativa (Resposta em texto livre)</span></div>
-              ) : q.alternatives.map((a, j) => (
-                <div key={a.id || j} className={`alternative-item ${a.isCorrect ? 'correct' : ''}`}>
-                  <span className="alt-letter">{String.fromCharCode(65 + j)}</span>
-                  <span className="alt-text">{a.text}</span>
-                  {a.isCorrect && <span className="alt-check">✓</span>}
+      {/* Questions list */}
+      {questions.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <FileText className="w-12 h-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Nenhuma questão cadastrada.</p>
+            <p className="text-sm text-muted-foreground">Clique em &quot;+ Nova Questão&quot; para começar.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {questions.map((q, i) => (
+            <Card key={q.id}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground bg-muted px-2 py-1 rounded">
+                      Questão {i + 1}
+                    </span>
+                    <Badge variant={q.type === 'ESSAY' ? 'secondary' : 'outline'} className="text-xs">
+                      {q.type === 'SINGLE_CHOICE' ? 'Escolha Única' : q.type === 'MULTIPLE_CHOICE' ? 'Múltipla Escolha' : 'Dissertativa'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={i === 0} onClick={() => moveQuestion(i, 'UP')}>
+                      <ArrowUp className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={i === questions.length - 1} onClick={() => moveQuestion(i, 'DOWN')}>
+                      <ArrowDown className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(q)}>
+                      <Edit2 className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => openDelete(q)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                <p className="text-sm leading-relaxed">{q.text}</p>
+                {q.type === 'ESSAY' ? (
+                  <p className="text-xs text-muted-foreground italic">Resposta em texto livre</p>
+                ) : (
+                  <div className="space-y-1">
+                    {q.alternatives.map((a, j) => (
+                      <div key={a.id || j} className={`flex items-center gap-2 text-sm px-3 py-2 rounded-md ${a.isCorrect ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted/40 text-muted-foreground'}`}>
+                        <span className="font-semibold w-5 shrink-0">{String.fromCharCode(65 + j)}</span>
+                        <span className="flex-1">{a.text}</span>
+                        {a.isCorrect && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {/* Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{editing ? 'Editar Questão' : 'Nova Questão'}</h3>
-              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+      {/* Create/Edit Modal */}
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Editar Questão' : 'Nova Questão'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Enunciado *</Label>
+              <Textarea
+                value={formText}
+                onChange={e => setFormText(e.target.value)}
+                rows={4}
+                required
+                placeholder="Digite o enunciado da questão..."
+              />
             </div>
-            <form onSubmit={handleSubmit} className="modal-body">
-              <div className="form-group">
-                <label>Enunciado *</label>
-                <textarea value={formText} onChange={e => setFormText(e.target.value)} rows={4} required placeholder="Digite o enunciado da questão..." />
-              </div>
-              <div className="form-group">
-                <label>Tipo</label>
-                <select value={formType} onChange={e => setFormType(e.target.value)}>
-                  <option value="SINGLE_CHOICE">Escolha Única</option>
-                  <option value="MULTIPLE_CHOICE">Múltipla Escolha</option>
-                  <option value="ESSAY">Dissertativa</option>
-                </select>
-              </div>
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={formType} onValueChange={setFormType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SINGLE_CHOICE">Escolha Única</SelectItem>
+                  <SelectItem value="MULTIPLE_CHOICE">Múltipla Escolha</SelectItem>
+                  <SelectItem value="ESSAY">Dissertativa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-              {formType !== 'ESSAY' && (
-                <div className="form-group">
-                  <label>Alternativas</label>
+            {formType !== 'ESSAY' && (
+              <div className="space-y-2">
+                <Label>Alternativas</Label>
+                <div className="space-y-2">
                   {formAlts.map((alt, i) => (
-                    <div key={i} className="alt-input-row">
-                      <span className="alt-letter-input">{String.fromCharCode(65 + i)}</span>
-                      <input
-                        type="text" value={alt.text}
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-muted-foreground w-6 shrink-0">{String.fromCharCode(65 + i)}</span>
+                      <Input
+                        value={alt.text}
                         onChange={e => updateAlt(i, 'text', e.target.value)}
                         placeholder={`Alternativa ${String.fromCharCode(65 + i)}`}
+                        className="flex-1"
                       />
-                      <label className="alt-correct-label">
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer shrink-0">
                         <input
                           type={formType === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'}
                           name="correct-alt"
                           checked={alt.isCorrect}
                           onChange={() => updateAlt(i, 'isCorrect', formType === 'SINGLE_CHOICE' ? true : !alt.isCorrect)}
+                          className="accent-emerald-500"
                         />
                         Correta
                       </label>
-                      <button type="button" className="btn btn-sm btn-danger" onClick={() => removeAlternative(i)} disabled={formAlts.length <= 2}>✕</button>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive shrink-0" onClick={() => removeAlternative(i)} disabled={formAlts.length <= 2}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   ))}
-                  <button type="button" className="btn btn-sm btn-outline" onClick={addAlternative}>+ Adicionar Alternativa</button>
+                  <Button type="button" variant="outline" size="sm" onClick={addAlternative}>
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Alternativa
+                  </Button>
                 </div>
-              )}
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Salvar' : 'Criar Questão'}</button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
+              <Button type="submit" disabled={saving}>
+                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {editing ? 'Salvar' : 'Criar Questão'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Modal */}
-      {deleteModalItem && (
-        <div className="modal-overlay" onClick={() => setDeleteModalItem(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ color: '#ef4444' }}>Excluir Questão</h3>
-              <button className="modal-close" onClick={() => setDeleteModalItem(null)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <p>Tem certeza que deseja excluir esta questão?</p>
-              <blockquote style={{ margin: '1rem 0', padding: '1rem', background: '#2a1a1a', borderLeft: '4px solid #ef4444', color: '#fca5a5', borderRadius: '4px', fontStyle: 'italic' }}>
-                "{deleteModalItem.text.substring(0, 100)}..."
+      <Dialog open={!!deleteModalItem} onOpenChange={() => setDeleteModalItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Excluir Questão</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Tem certeza que deseja excluir esta questão? Esta ação não pode ser desfeita.</p>
+            {deleteModalItem && (
+              <blockquote className="border-l-4 border-destructive pl-3 text-sm text-muted-foreground italic">
+                &ldquo;{deleteModalItem.text.substring(0, 100)}{deleteModalItem.text.length > 100 ? '...' : ''}&rdquo;
               </blockquote>
-              <div className="form-group" style={{ marginTop: '1.5rem' }}>
-                <label>Digite <strong>EXCLUIR</strong> para confirmar:</label>
-                <input 
-                  type="text" 
-                  value={deleteConfirmText} 
-                  onChange={e => setDeleteConfirmText(e.target.value)} 
-                  placeholder="EXCLUIR"
-                  style={{ borderColor: deleteConfirmText === 'EXCLUIR' ? '#22c55e' : '' }}
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setDeleteModalItem(null)}>Cancelar</button>
-              <button 
-                type="button" 
-                className="btn btn-danger" 
-                disabled={deleteConfirmText !== 'EXCLUIR'}
-                onClick={confirmDelete}
-              >
-                Excluir Definitivamente
-              </button>
+            )}
+            <div className="space-y-2">
+              <Label>Digite <strong>EXCLUIR</strong> para confirmar:</Label>
+              <Input
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder="EXCLUIR"
+                className={deleteConfirmText === 'EXCLUIR' ? 'border-emerald-500' : ''}
+              />
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteModalItem(null)}>Cancelar</Button>
+            <Button variant="destructive" disabled={deleteConfirmText !== 'EXCLUIR' || deleting} onClick={confirmDelete}>
+              {deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Excluir Definitivamente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Import Modal */}
-      {showImportModal && (
-        <div className="modal-overlay" onClick={() => !importing && setShowImportModal(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Importar Questões via CSV</h3>
-              <button className="modal-close" onClick={() => !importing && setShowImportModal(false)}>✕</button>
+      <Dialog open={showImportModal} onOpenChange={(v) => { if (!importing) setShowImportModal(v); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Importar Questões via CSV</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleImportSubmit} className="space-y-4">
+            <p className="text-sm text-muted-foreground">Envie um arquivo <code className="bg-muted px-1 rounded">.csv</code> com a estrutura esperada para inserção em lote.</p>
+            <div className="flex items-center justify-between bg-muted/50 rounded-lg p-3">
+              <div>
+                <p className="text-sm font-medium">Template CSV</p>
+                <p className="text-xs text-muted-foreground">Separador: ponto-e-vírgula (;)</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>Baixar Template</Button>
             </div>
-            <form onSubmit={handleImportSubmit} className="modal-body">
-              <p>Envie um arquivo <code>.csv</code> contendo a estrutura esperada para inserção em lote de questões.</p>
-              
-              <div style={{ background: '#1f2937', padding: '1rem', borderRadius: '4px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <strong>Formato Opcional/Template</strong>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#9ca3af' }}>Recomendamos baixar o nosso template para evitar erros de formatação (separador usado: ';').</p>
-                </div>
-                <button type="button" className="btn btn-sm btn-secondary" onClick={downloadTemplate}>Baixar Template</button>
+            <div className="space-y-2">
+              <Label>Arquivo CSV *</Label>
+              <Input type="file" accept=".csv" required onChange={e => setImportFile(e.target.files?.[0] || null)} />
+            </div>
+            {importErrors.length > 0 && (
+              <div className="border border-destructive/50 bg-destructive/10 rounded-lg p-3 max-h-48 overflow-y-auto">
+                <p className="text-sm font-semibold text-destructive mb-1">Atenção:</p>
+                <ul className="text-xs text-destructive space-y-1 list-disc list-inside">
+                  {importErrors.map((err, i) => <li key={i}>{err}</li>)}
+                </ul>
               </div>
-
-              <div className="form-group">
-                <label>Arquivo CSV *</label>
-                <input 
-                  type="file" 
-                  accept=".csv" 
-                  required
-                  onChange={e => setImportFile(e.target.files?.[0] || null)}
-                  style={{ display: 'block', padding: '0.5rem 0' }}
-                />
-              </div>
-
-              {importErrors.length > 0 && (
-                <div style={{ background: '#2a1a1a', borderLeft: '4px solid #ef4444', padding: '1rem', marginTop: '1rem', color: '#fca5a5', borderRadius: '4px', maxHeight: '200px', overflowY: 'auto' }}>
-                  <p style={{ fontWeight: 'bold', margin: '0 0 0.5rem 0' }}>Atenção:</p>
-                  <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.9rem' }}>
-                    {importErrors.map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
-
-              <div className="modal-footer" style={{ marginTop: '1.5rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowImportModal(false)} disabled={importing}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={!importFile || importing}>
-                  {importing ? 'Importando...' : 'Iniciar Importação'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowImportModal(false)} disabled={importing}>Cancelar</Button>
+              <Button type="submit" disabled={!importFile || importing}>
+                {importing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {importing ? 'Importando...' : 'Iniciar Importação'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Import Success Modal */}
-      {importSuccessMsg && (
-        <div className="modal-overlay" onClick={() => setImportSuccessMsg('')}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ textAlign: 'center', maxWidth: '400px' }}>
-            <div style={{ fontSize: '3.5rem', margin: '0.5rem 0', color: '#10b981' }}>🎉</div>
-            <h3 style={{ marginBottom: '1rem', color: '#10b981', fontSize: '1.5rem' }}>Importação Concluída!</h3>
-            <p style={{ color: '#d1d5db', marginBottom: '2rem', fontSize: '1.1rem' }}>{importSuccessMsg}</p>
-            <button className="btn btn-primary" style={{ width: '100%', padding: '0.75rem' }} onClick={() => setImportSuccessMsg('')}>
-              Continuar
-            </button>
-          </div>
-        </div>
-      )}
+      <Dialog open={!!importSuccessMsg} onOpenChange={() => setImportSuccessMsg('')}>
+        <DialogContent className="max-w-sm text-center">
+          <div className="text-5xl mb-2">🎉</div>
+          <DialogTitle className="text-emerald-500 text-xl">Importação Concluída!</DialogTitle>
+          <p className="text-muted-foreground text-sm mt-2">{importSuccessMsg}</p>
+          <DialogFooter className="mt-4">
+            <Button className="w-full" onClick={() => setImportSuccessMsg('')}>Continuar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

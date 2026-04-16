@@ -80,7 +80,7 @@ router.post('/register', async (req: Request, res: Response) => {
     });
 
     const payload: AuthPayload = { userId: user.id, email: user.email, role: user.role };
-    const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: '7d' });
 
     await prisma.user.update({
       where: { id: user.id },
@@ -122,7 +122,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const { ip, device } = getClientInfo(req);
     const payload: AuthPayload = { userId: user.id, email: user.email, role: user.role };
-    const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: '7d' });
 
     // Update session token (invalidates previous sessions - blocks multiple logins)
     await prisma.user.update({

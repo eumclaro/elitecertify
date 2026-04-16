@@ -242,7 +242,7 @@ export async function sendPasswordResetEmail(name: string, email: string, resetL
     EMAIL: email,
     RESET_LINK: resetLink,
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
-  });
+  }, 'Redefinição de senha - Elite Training');
 }
 
 export async function sendInviteEmail(name: string, email: string, role: string, inviteLink: string) {
@@ -298,7 +298,7 @@ export async function sendExamReleasedEmail(name: string, email: string, examNam
     EMAIL: email,
     EXAM_NAME: examName,
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
-  });
+  }, `Você tem uma nova prova disponível: ${examName}`);
 }
 
 export async function sendExamPassedEmail(
@@ -323,7 +323,7 @@ export async function sendExamPassedEmail(
     STATUS: 'APROVADO',
     CERTIFICATE_LINK: certificateUrl || '',
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
-  });
+  }, `Parabéns! Você foi aprovado em: ${examName}`);
 }
 
 export async function sendExamFailedEmail(
@@ -353,7 +353,7 @@ export async function sendExamFailedEmail(
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
   };
   console.log('[MAIL DEBUG] dynamicData sendo enviado:', JSON.stringify(dynamicData, null, 2));
-  return dispatchTemplateToMandrill('EXAM_FAILED', email, name, dynamicData);
+  return dispatchTemplateToMandrill('EXAM_FAILED', email, name, dynamicData, `Resultado da prova: ${examName}`);
 }
 
 export async function sendExamAbandonedEmail(name: string, email: string, examName: string, lastName: string = '') {
@@ -364,7 +364,7 @@ export async function sendExamAbandonedEmail(name: string, email: string, examNa
     EXAM_NAME: examName,
     STATUS: 'DESCLASSIFICADO',
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
-  });
+  }, `Prova não finalizada: ${examName}`);
 }
 
 export async function sendCooldownReleasedEmail(name: string, email: string, examName: string, lastName: string = '') {
@@ -374,7 +374,7 @@ export async function sendCooldownReleasedEmail(name: string, email: string, exa
     EMAIL: email,
     EXAM_NAME: examName,
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
-  });
+  }, `Você já pode tentar novamente: ${examName}`);
 }
 
 export async function sendEventReferralEmail(

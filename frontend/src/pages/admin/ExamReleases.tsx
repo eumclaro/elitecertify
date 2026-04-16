@@ -12,6 +12,15 @@ import {
 import { ArrowLeft, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface ExamRelease {
   id: string;
@@ -335,31 +344,29 @@ export default function ExamReleases() {
         </Table>
       </div>
 
-      {/* Custom Confirm Modal for Revoking Access */}
-      {confirmRevoke && (
-        <div className="modal-overlay" onClick={() => setConfirmRevoke(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <div className="modal-header">
-              <h3>Confirmar Revogação</h3>
-              <button className="modal-close" onClick={() => setConfirmRevoke(null)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <p>Tem certeza que deseja revogar o acesso {confirmRevoke.type === 'class' ? 'da turma' : 'do aluno'} <strong>{confirmRevoke.name}</strong>?</p>
-              <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: '1rem', color: '#9ca3af' }}>
-                Esta ação impedirá o início da prova a partir de agora, mas não apagará o histórico de resultados de tentativas já realizadas.
-              </p>
-              <div className="modal-footer" style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-                <button className="btn btn-secondary" onClick={() => setConfirmRevoke(null)} disabled={actionLoading !== null}>
-                  Cancelar
-                </button>
-                <button className="btn btn-danger" onClick={executeRevoke} disabled={actionLoading !== null}>
-                  {actionLoading ? 'Revogando...' : 'Sim, Revogar Acesso'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Confirm Revoke Dialog */}
+      <Dialog open={!!confirmRevoke} onOpenChange={(open) => { if (!open) setConfirmRevoke(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Confirmar Revogação</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja revogar o acesso {confirmRevoke?.type === 'class' ? 'da turma' : 'do aluno'}{' '}
+              <strong className="text-foreground">{confirmRevoke?.name}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Esta ação impedirá o início da prova a partir de agora, mas não apagará o histórico de resultados de tentativas já realizadas.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmRevoke(null)} disabled={actionLoading !== null}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={executeRevoke} disabled={actionLoading !== null}>
+              {actionLoading ? 'Revogando...' : 'Sim, Revogar Acesso'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

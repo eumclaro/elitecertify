@@ -27,14 +27,10 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, env.JWT_SECRET) as AuthPayload;
 
-    // Verify session token matches (prevents multiple simultaneous logins)
+    // Verify user exists and is active
     const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
     if (!user || !user.active) {
       return res.status(401).json({ error: 'Usuário inativo ou não encontrado' });
-    }
-
-    if (user.sessionToken && user.sessionToken !== token) {
-      return res.status(401).json({ error: 'Sessão expirada. Outro login foi detectado.' });
     }
 
     req.user = decoded;

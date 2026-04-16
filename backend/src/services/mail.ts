@@ -232,7 +232,7 @@ export async function sendWelcomeEmail(name: string, email: string, rawPassword?
     EMAIL: email,
     PASSWORD: rawPassword || '',
     SUPPORT_EMAIL: 'suporte@elitetraining.com.br'
-  });
+  }, 'Suas credenciais de acesso - Elite Training');
 }
 
 export async function sendPasswordResetEmail(name: string, email: string, resetLink: string, lastName: string = '') {

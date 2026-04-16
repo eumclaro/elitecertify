@@ -142,7 +142,7 @@ router.get('/charts/performance', authMiddleware, requireRole('ADMIN'), async (r
 // ============================================================
 router.get('/class/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = req.params.id as string;
     const { start, end } = getDateRange(req);
 
     const classData: any = await prisma.class.findUnique({
@@ -231,7 +231,7 @@ router.get('/class/:id', authMiddleware, requireRole('ADMIN'), async (req: Reque
 // ============================================================
 router.get('/exam/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = req.params.id as string;
     const { start, end } = getDateRange(req);
 
     const exam: any = await prisma.exam.findUnique({

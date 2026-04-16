@@ -358,10 +358,10 @@ router.post('/:id/resend-access', authMiddleware, requireRole('ADMIN'), checkPer
     // Validação de Vínculo de Template (Nova Regra Etapa 1)
     const binding = await prisma.emailEventBinding.findUnique({ 
       where: { eventKey: 'STUDENT_CREATED' },
-      include: { template: true }
+      include: { internalTemplate: true }
     });
 
-    if (!binding || !binding.isActive || !binding.template) {
+    if (!binding || !binding.isActive || !binding.internalTemplate) {
       return res.status(412).json({ 
         error: 'TEMPLATE_NOT_CONFIGURED', 
         message: 'O template STUDENT_CREATED não possui um vínculo ativo configurado.' 

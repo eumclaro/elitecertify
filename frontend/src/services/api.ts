@@ -15,10 +15,15 @@ api.interceptors.request.use((config) => {
 });
 
 // Handle 401 responses (expired/invalid token)
+// Only force logout if the 401 comes from an auth endpoint or /auth/me.
+// A 401 on a data endpoint (e.g. missing permission) should not kill the session.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const url: string = error.config?.url || '';
+    const isAuthEndpoint = url.includes('/auth/me') || url.includes('/auth/login');
+    if (status === 401 && isAuthEndpoint) {
       localStorage.removeItem('elt-cert-token');
       localStorage.removeItem('elt-cert-user');
       window.location.href = '/login';

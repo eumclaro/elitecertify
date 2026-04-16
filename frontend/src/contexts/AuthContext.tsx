@@ -44,15 +44,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (savedToken && savedUser) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
-      // Validate token
+      // Validate token — only clear session on explicit 401, not on network errors
       api.get('/auth/me').then(res => {
         setUser(res.data);
         localStorage.setItem('elt-cert-user', JSON.stringify(res.data));
-      }).catch(() => {
-        localStorage.removeItem('elt-cert-token');
-        localStorage.removeItem('elt-cert-user');
-        setToken(null);
-        setUser(null);
+      }).catch((err) => {
+        const status = err?.response?.status;
+        if (status === 401) {
+          localStorage.removeItem('elt-cert-token');
+          localStorage.removeItem('elt-cert-user');
+          setToken(null);
+          setUser(null);
+        }
+        // Network errors or 5xx: keep the session alive, user stays logged in
       }).finally(() => setLoading(false));
     } else {
       setLoading(false);

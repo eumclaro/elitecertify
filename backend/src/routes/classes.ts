@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { sendExamReleasedEmail } from '../services/mail';
 import { checkPermission } from '../middlewares/checkPermission';
 
 const router = Router();
@@ -231,6 +232,26 @@ router.put('/:id/students', authMiddleware, requireRole('ADMIN'), checkPermissio
           studentId
         }))
       });
+
+      // Notify newly added students about exams already released for this class (non-blocking)
+      const classId = req.params.id as string;
+      prisma.examRelease.findMany({
+        where: { classId },
+        include: { exam: { select: { title: true } } }
+      }).then(async releases => {
+        if (releases.length === 0) return;
+        const students = await prisma.student.findMany({
+          where: { id: { in: studentIds } },
+          include: { user: true }
+        });
+        for (const student of students) {
+          if (student.user) {
+            for (const release of releases) {
+              sendExamReleasedEmail(student.user.name, student.user.email, release.exam.title, (student as any).lastName || '').catch(() => {});
+            }
+          }
+        }
+      }).catch(() => {});
     }
 
     return res.json({ message: 'Alunos vinculados com sucesso' });

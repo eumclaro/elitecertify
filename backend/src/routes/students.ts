@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import prisma from '../config/database';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { checkPermission } from '../middlewares/checkPermission';
-import { sendWelcomeEmail } from '../services/mail';
+import { sendWelcomeEmail, sendExamReleasedEmail } from '../services/mail';
 
 const router = Router();
 
@@ -630,6 +630,23 @@ router.post('/:id/enroll', authMiddleware, requireRole('ADMIN'), checkPermission
       },
       include: { class: true }
     });
+
+    // Notify student about exams already released for this class (non-blocking)
+    prisma.examRelease.findMany({
+      where: { classId },
+      include: { exam: { select: { title: true } } }
+    }).then(async releases => {
+      if (releases.length === 0) return;
+      const student = await prisma.student.findUnique({
+        where: { id: req.params.id as string },
+        include: { user: true }
+      });
+      if (student?.user) {
+        for (const release of releases) {
+          sendExamReleasedEmail(student.user.name, student.user.email, release.exam.title, (student as any).lastName || '').catch(() => {});
+        }
+      }
+    }).catch(() => {});
 
     return res.status(201).json(enrollment);
   } catch (error: any) {

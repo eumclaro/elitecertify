@@ -74,7 +74,7 @@ export async function getActiveTransport() {
     // Fallback absoluto pro .env (caso nenhuma definicao de painel exista)
     transportParams = {
       host: process.env.SMTP_HOST || 'smtp.mandrillapp.com',
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      port: parseInt(process.env.SMTP_PORT || '2525', 10),
       secure: process.env.SMTP_PORT === '465',
       auth: {
         user: process.env.SMTP_USER || '',

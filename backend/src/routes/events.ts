@@ -10,7 +10,7 @@ const router = Router();
 // GET /api/events
 router.get('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const isAdmin = req.user?.role === 'ADMIN';
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(req.user?.role ?? '');
     const events = await prisma.event.findMany({
       where: isAdmin ? {} : { status: 'PUBLISHED' },
       orderBy: { date: 'asc' },

@@ -29,7 +29,7 @@ router.get('/:code/pdf', authMiddleware, async (req: Request, res: Response) => 
     // Apenas o próprio aluno ou admin podem baixar
     const requestingUserId = (req as any).user.userId;
     const isOwner = certificate.student.userId === requestingUserId;
-    const isAdmin = (req as any).user.role === 'ADMIN';
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes((req as any).user.role);
     
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ error: 'Acesso negado.' });

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import Dispatches from './Dispatches';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import api from '../../services/api';
 import {
   Table,
@@ -104,13 +106,18 @@ export default function AuditLogs() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Auditoria</h1>
-          <p className="text-muted-foreground">Histórico completo de ações e acessos ao sistema</p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Auditoria</h1>
+        <p className="text-muted-foreground">Histórico completo de ações e comunicações do sistema</p>
       </div>
 
+      <Tabs defaultValue="activity">
+        <TabsList className="mb-4">
+          <TabsTrigger value="activity">Atividade do Sistema</TabsTrigger>
+          <TabsTrigger value="dispatches">Disparos de E-mail</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="activity" className="space-y-6">
       <div className="flex items-center gap-4">
         <div className="w-[240px]">
           <Select
@@ -248,6 +255,12 @@ export default function AuditLogs() {
           </div>
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="dispatches" className="-mx-6">
+          <Dispatches />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -17,7 +17,6 @@ import Reports from './pages/admin/Reports';
 import AuditLogs from './pages/admin/AuditLogs';
 import SmtpSettings from './pages/admin/SmtpSettings';
 import EmailManagement from './pages/admin/EmailManagement';
-import Dispatches from './pages/admin/Dispatches';
 import StudentExams from './pages/student/StudentExams';
 import TakeExam from './pages/student/TakeExam';
 import ExamResult from './pages/student/ExamResult';
@@ -60,7 +59,7 @@ function AppRoutes() {
       <Route path="/admin/audit" element={<ProtectedRoute requiredPermission="canManageAdmins"><Layout><AuditLogs /></Layout></ProtectedRoute>} />
       <Route path="/admin/smtp" element={<ProtectedRoute requiredPermission="canManageSettings"><Layout><SmtpSettings /></Layout></ProtectedRoute>} />
       <Route path="/admin/emails" element={<ProtectedRoute requiredPermission="canManageSettings"><Layout><EmailManagement /></Layout></ProtectedRoute>} />
-      <Route path="/admin/dispatches" element={<ProtectedRoute><Layout><Dispatches /></Layout></ProtectedRoute>} />
+      <Route path="/admin/dispatches" element={<Navigate to="/admin/audit" replace />} />
       <Route path="/admin/events" element={<ProtectedRoute requiredPermission="canManageMarketing"><Layout><Events /></Layout></ProtectedRoute>} />
       <Route path="/admin/certificate-templates" element={<ProtectedRoute requiredPermission="canManageSettings"><Layout><CertificateTemplates /></Layout></ProtectedRoute>} />
 

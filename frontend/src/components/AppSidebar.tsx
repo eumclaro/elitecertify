@@ -11,7 +11,6 @@ import {
   UserCircle,
   LogOut,
   ChevronUp,
-  Send,
   CalendarDays,
   Medal,
   ShieldCheck,
@@ -49,7 +48,6 @@ const adminLinks = [
   { path: '/admin/certificate-templates', label: 'Templates de Certificado', icon: Medal },
   { path: '/admin/smtp', label: 'Settings', icon: Settings },
   { path: '/admin/emails', label: 'Templates de E-mail', icon: Mail },
-  { path: '/admin/dispatches', label: 'Disparos', icon: Send },
   { path: '/admin/events', label: 'Marketing Hub', icon: CalendarDays },
   { path: '/admin/team', label: 'Equipe', icon: ShieldCheck },
 ];

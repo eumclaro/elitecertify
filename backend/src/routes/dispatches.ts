@@ -32,6 +32,168 @@ router.get('/', authMiddleware, requireRole('ADMIN'), async (req: Request, res: 
   }
 });
 
+// GET /api/dispatches/history — Histórico unificado (lotes + transacionais)
+router.get('/history', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const period   = parseInt(req.query.period  as string) || 30;
+    const type     = (req.query.type    as string) || 'all';
+    const search   = (req.query.search  as string) || '';
+    const page     = parseInt(req.query.page   as string) || 1;
+    const limit    = parseInt(req.query.limit  as string) || 20;
+
+    const since = new Date();
+    since.setDate(since.getDate() - period);
+
+    // ── 1. Buscar todos os EmailLogs no período, com filtros básicos ──────────
+    const baseWhere: any = { createdAt: { gte: since } };
+    if (search) {
+      baseWhere.recipient = { contains: search, mode: 'insensitive' };
+    }
+    if (type === 'batch') {
+      baseWhere.dispatchId = { not: null };
+    } else if (type === 'transactional') {
+      baseWhere.dispatchId = null;
+    } else if (type === 'failed') {
+      baseWhere.status = 'FAILED';
+    }
+
+    const allLogs = await (prisma.emailLog as any).findMany({
+      where: baseWhere,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // ── 2. Enriquecer com recipientName via student lookup ────────────────────
+    const emails = [...new Set(allLogs.map((l: any) => l.recipient))] as string[];
+    const students = await prisma.student.findMany({
+      where: { user: { email: { in: emails } } },
+      select: { lastName: true, user: { select: { name: true, email: true } } },
+    });
+    const emailToName: Record<string, string> = {};
+    for (const s of students) {
+      const full = [s.user.name, (s as any).lastName].filter(Boolean).join(' ');
+      emailToName[s.user.email] = full;
+    }
+
+    // ── 3. Agrupar: logs COM dispatchId → batch; SEM → transactional ─────────
+    const batchMap: Record<string, any[]> = {};
+    const transactionalItems: any[] = [];
+
+    for (const log of allLogs) {
+      const enriched = {
+        id:             log.id,
+        recipientEmail: log.recipient,
+        recipientName:  emailToName[log.recipient] || log.recipient,
+        status:         log.status,
+        mandrillMsgId:  log.mandrillMsgId,
+        sentAt:         log.sentAt,
+        errorMessage:   log.errorMessage,
+      };
+
+      if (log.dispatchId) {
+        if (!batchMap[log.dispatchId]) batchMap[log.dispatchId] = [];
+        batchMap[log.dispatchId].push({ ...enriched, eventKey: log.eventKey });
+      } else {
+        transactionalItems.push({
+          id:               log.id,
+          type:             'transactional',
+          eventKey:         log.eventKey,
+          templateName:     log.templateUsed || log.eventKey,
+          totalRecipients:  1,
+          totalSuccess:     log.status === 'SENT'   ? 1 : 0,
+          totalFailed:      log.status === 'FAILED' ? 1 : 0,
+          createdAt:        log.createdAt,
+          logs:             [enriched],
+        });
+      }
+    }
+
+    // ── 4. Buscar Dispatches referenciados para obter metadata ────────────────
+    const dispatchIds = Object.keys(batchMap);
+    const dispatches = dispatchIds.length
+      ? await prisma.dispatch.findMany({ where: { id: { in: dispatchIds } } })
+      : [];
+    const dispatchById: Record<string, any> = Object.fromEntries(dispatches.map(d => [d.id, d]));
+
+    const batchItems: any[] = dispatchIds.map(did => {
+      const logs      = batchMap[did];
+      const dispatch  = dispatchById[did] || {};
+      const success   = logs.filter((l: any) => l.status === 'SENT').length;
+      const failed    = logs.filter((l: any) => l.status === 'FAILED').length;
+      const eventKey  = logs[0]?.eventKey || '';
+      const tplInfo   = Object.values(MANDRILL_TEMPLATES).find(
+        (t: any) => Array.isArray(t.eventSlug)
+          ? t.eventSlug.includes(eventKey)
+          : t.eventSlug === eventKey
+      );
+      return {
+        id:              did,
+        type:            'batch',
+        eventKey,
+        templateName:    tplInfo ? (tplInfo as any).name : (dispatch.templateSlug || eventKey),
+        totalRecipients: logs.length,
+        totalSuccess:    success,
+        totalFailed:     failed,
+        createdAt:       dispatch.createdAt || logs[0]?.createdAt,
+        logs:            logs.map(({ eventKey: _ek, ...rest }: any) => rest),
+      };
+    });
+
+    // ── 5. Montar lista unificada e aplicar filtro failed pós-agrupamento ─────
+    let unified = [...batchItems, ...transactionalItems].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    if (type === 'failed') {
+      unified = unified.filter(item => item.totalFailed > 0);
+    }
+
+    // ── 6. Paginação ──────────────────────────────────────────────────────────
+    const total      = unified.length;
+    const paginated  = unified.slice((page - 1) * limit, page * limit);
+
+    // ── 7. Summary ────────────────────────────────────────────────────────────
+    const totalSent    = unified.reduce((s, i) => s + i.totalRecipients, 0);
+    const totalSuccess = unified.reduce((s, i) => s + i.totalSuccess,    0);
+    const totalFailed  = unified.reduce((s, i) => s + i.totalFailed,     0);
+    const totalBatches = batchItems.length;
+
+    return res.json({
+      summary: { totalSent, totalSuccess, totalFailed, totalBatches },
+      items:   paginated,
+      pagination: { page, limit, total },
+    });
+  } catch (error) {
+    console.error('History error:', error);
+    return res.status(500).json({ error: 'Erro ao carregar histórico de disparos' });
+  }
+});
+
+// GET /api/dispatches/available-templates — Templates prontos para disparo em massa
+router.get('/available-templates', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const bindings = await prisma.emailEventBinding.findMany({
+      where: {
+        isActive: true,
+        internalTemplateId: { not: null },
+        internalTemplate: { status: 'ACTIVE' },
+      },
+      include: { internalTemplate: true },
+    });
+
+    const result = bindings.map((b: any) => ({
+      eventKey:     b.eventKey,
+      templateName: b.internalTemplate?.name || b.eventKey,
+      description:  b.internalTemplate?.description || null,
+      isReady:      true,
+    }));
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Available templates error:', error);
+    return res.status(500).json({ error: 'Erro ao carregar templates disponíveis' });
+  }
+});
+
 // GET /api/dispatches/exams-with-releases — Listar provas que têm liberações
 router.get('/exams-with-releases', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {

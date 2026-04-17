@@ -336,7 +336,7 @@ export default function Classes() {
                             <TooltipTrigger asChild>
                               <button 
                                 onClick={() => handleManageClass(c.id)}
-                                className="font-bold text-blue-600 hover:text-blue-700 hover:underline text-left cursor-pointer transition-all"
+                                className="font-bold hover:underline text-left cursor-pointer transition-all"
                               >
                                 {c.name}
                               </button>

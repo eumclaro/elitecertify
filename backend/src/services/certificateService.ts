@@ -16,7 +16,7 @@ interface CertificateData {
 }
 
 export async function generateCertificatePdf(data: CertificateData): Promise<Buffer> {
-  const templatePath = path.resolve(__dirname, '../assets/certificates', data.templateFile)
+  const templatePath = path.resolve(process.cwd(), 'assets/certificates', data.templateFile)
 
   if (!fs.existsSync(templatePath)) {
     throw new Error(`Template não encontrado: ${data.templateFile}`)

@@ -10,7 +10,7 @@ import { checkPermission } from '../middlewares/checkPermission';
 const router = Router();
 
 // Ensure upload directory exists
-const uploadDir = path.resolve(__dirname, '../assets/certificates');
+const uploadDir = path.resolve(process.cwd(), 'assets/certificates');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }

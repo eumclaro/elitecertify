@@ -67,12 +67,12 @@ app.use('/api/certificates', certificateRoutes);
 app.use('/api/certificate-templates', certificateTemplatesRoutes);
 
 // Static assets
-const systemAssetsPath = path.join(__dirname, 'assets/system');
+const systemAssetsPath = path.join(process.cwd(), 'assets/system');
 if (!fs.existsSync(systemAssetsPath)) {
   fs.mkdirSync(systemAssetsPath, { recursive: true });
 }
 app.use('/assets/system', express.static(systemAssetsPath));
-app.use('/uploads/certificates', express.static(path.join(__dirname, 'assets/certificates')));
+app.use('/uploads/certificates', express.static(path.join(process.cwd(), 'assets/certificates')));
 
 // 404
 app.use((_req, res) => {

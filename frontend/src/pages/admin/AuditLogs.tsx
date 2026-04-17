@@ -84,6 +84,7 @@ export default function AuditLogs() {
 
   const actionLabels: Record<string, { label: string; color: string }> = {
     'LOGIN': { label: 'Login', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+    'LOGIN_FAILED': { label: 'Falha de Login', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
     'LOGOUT': { label: 'Logout', color: 'bg-slate-500/10 text-slate-600 border-slate-500/20' },
     'REGISTER': { label: 'Registro', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
     'EXAM_START': { label: 'Prova Iniciada', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
@@ -101,7 +102,7 @@ export default function AuditLogs() {
 
   const formatDate = (d: string) => {
     const dt = new Date(d);
-    return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
   return (
@@ -196,9 +197,23 @@ export default function AuditLogs() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={`font-black uppercase text-[10px] tracking-widest px-2 py-0.5 border shadow-none ${display.color}`}>
-                          {display.label}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge className={`font-black uppercase text-[10px] tracking-widest px-2 py-0.5 border shadow-none w-fit ${display.color}`}>
+                            {display.label}
+                          </Badge>
+                          {log.action === 'LOGIN_FAILED' && log.metadata && (() => {
+                            const reasonLabels: Record<string, string> = {
+                              USER_NOT_FOUND: 'Usuário não encontrado',
+                              ACCOUNT_DISABLED: 'Conta desativada',
+                              WRONG_PASSWORD: 'Senha incorreta',
+                            };
+                            try {
+                              const meta = JSON.parse(log.metadata);
+                              const label = reasonLabels[meta.reason];
+                              return label ? <span className="text-[10px] text-red-500 font-medium">{label}</span> : null;
+                            } catch { return null; }
+                          })()}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-0.5 max-w-[150px]">

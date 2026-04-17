@@ -108,15 +108,48 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({ where: { email }, include: { student: true } });
     if (!user) {
+      prisma.auditEvent.create({
+        data: {
+          userId: null,
+          action: 'LOGIN_FAILED',
+          entity: 'user',
+          entityId: null,
+          ip: req.ip,
+          device: req.headers['user-agent'] as string,
+          metadata: JSON.stringify({ reason: 'USER_NOT_FOUND', attemptedEmail: email }),
+        },
+      }).catch(() => {});
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
     if (!user.active) {
+      prisma.auditEvent.create({
+        data: {
+          userId: user.id,
+          action: 'LOGIN_FAILED',
+          entity: 'user',
+          entityId: user.id,
+          ip: req.ip,
+          device: req.headers['user-agent'] as string,
+          metadata: JSON.stringify({ reason: 'ACCOUNT_DISABLED', attemptedEmail: email, userId: user.id }),
+        },
+      }).catch(() => {});
       return res.status(403).json({ error: 'Conta desativada. Contate o administrador.' });
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
+      prisma.auditEvent.create({
+        data: {
+          userId: user.id,
+          action: 'LOGIN_FAILED',
+          entity: 'user',
+          entityId: user.id,
+          ip: req.ip,
+          device: req.headers['user-agent'] as string,
+          metadata: JSON.stringify({ reason: 'WRONG_PASSWORD', attemptedEmail: email, userId: user.id }),
+        },
+      }).catch(() => {});
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 

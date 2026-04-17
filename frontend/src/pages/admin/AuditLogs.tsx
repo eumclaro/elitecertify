@@ -192,7 +192,7 @@ export default function AuditLogs() {
                             ) : (
                               <span className="font-bold">{log.user?.name || 'Sistema'}</span>
                             )}
-                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">{log.user?.email || ''}</span>
+                            <span className="text-[10px] text-muted-foreground font-medium tracking-tight">{log.user?.email || ''}</span>
                           </div>
                         </div>
                       </TableCell>

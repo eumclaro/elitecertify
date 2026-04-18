@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle2, ChevronRight, ChevronLeft, Star } from 'lucide-react';
+import NpsScoreSelector from '@/components/NpsScoreSelector';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 
@@ -106,28 +107,10 @@ export default function StudentNps() {
     switch (q.type) {
       case 'SCORE':
         return (
-          <div className="space-y-6 pt-4">
-            <div className="flex justify-between gap-1">
-              {[...Array(11)].map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => handleScore(q.id, i)}
-                  className={`size-10 sm:size-12 rounded-lg border-2 font-bold transition-all flex items-center justify-center ${
-                    answer?.score === i 
-                      ? 'bg-primary border-primary text-primary-foreground shadow-lg scale-110' 
-                      : 'border-muted hover:border-primary/50'
-                  }`}
-                >
-                  {i}
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-between text-[10px] font-black uppercase text-muted-foreground px-1">
-               <span>Pouco Provável</span>
-               <span>Muito Provável</span>
-            </div>
-          </div>
+          <NpsScoreSelector
+            value={answer?.score ?? null}
+            onChange={(score) => handleScore(q.id, score)}
+          />
         );
       
       case 'RATING_5':

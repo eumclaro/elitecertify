@@ -30,8 +30,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     labels:
       - "traefik.docker.network=coolify"
     networks:

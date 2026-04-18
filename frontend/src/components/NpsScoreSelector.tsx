@@ -1,3 +1,6 @@
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 interface NpsScoreSelectorProps {
   value: number | null;
   onChange: (score: number) => void;
@@ -39,66 +42,89 @@ const getCategory = (score: number): 'detractor' | 'passive' | 'promoter' => {
 const CATEGORY_STYLES = {
   detractor: {
     Face: DetractorFace,
-    ring: 'ring-4 ring-red-500',
-    hover: 'hover:border-red-400 hover:bg-red-50',
-    label: 'text-red-500',
-    border: 'border-red-500',
+    selectedBg: 'bg-red-50 border border-red-200',
+    hover: 'hover:bg-red-50 hover:border-red-200',
     number: 'text-red-600',
+    tooltip: 'Não recomendaria',
+    tooltipClass: 'bg-red-600 text-white',
+    tooltipArrow: 'fill-red-600',
+    feedback: 'text-red-600',
   },
   passive: {
     Face: NeutralFace,
-    ring: 'ring-4 ring-yellow-400',
-    hover: 'hover:border-yellow-300 hover:bg-yellow-50',
-    label: 'text-amber-500',
-    border: 'border-yellow-400',
+    selectedBg: 'bg-yellow-50 border border-yellow-200',
+    hover: 'hover:bg-yellow-50 hover:border-yellow-200',
     number: 'text-yellow-600',
+    tooltip: 'Não fez diferença relevante',
+    tooltipClass: 'bg-amber-500 text-slate-900',
+    tooltipArrow: 'fill-amber-500',
+    feedback: 'text-yellow-600',
   },
   promoter: {
     Face: PromoterFace,
-    ring: 'ring-4 ring-green-500',
-    hover: 'hover:border-green-400 hover:bg-green-50',
-    label: 'text-emerald-500',
-    border: 'border-green-500',
+    selectedBg: 'bg-green-50 border border-green-200',
+    hover: 'hover:bg-green-50 hover:border-green-200',
     number: 'text-green-600',
+    tooltip: 'Recomendaria com certeza',
+    tooltipClass: 'bg-green-600 text-white',
+    tooltipArrow: 'fill-green-600',
+    feedback: 'text-green-600',
   },
 };
 
 export default function NpsScoreSelector({ value, onChange }: NpsScoreSelectorProps) {
-  return (
-    <div className="space-y-4 pt-2">
-      <div className="grid grid-cols-4 sm:flex sm:justify-between gap-2">
-        {[...Array(11)].map((_, i) => {
-          const cat = getCategory(i);
-          const styles = CATEGORY_STYLES[cat];
-          const isSelected = value === i;
-          const { Face } = styles;
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onChange(i)}
-              className={`flex flex-col items-center gap-1 px-1 py-2 rounded-xl border-2 font-bold transition-all duration-150
-                ${isSelected
-                  ? `${styles.border} ${styles.ring} bg-background shadow-lg`
-                  : `border-muted bg-background ${styles.hover}`
-                }`}
-            >
-              <span className={`transition-transform duration-150 ${isSelected ? 'scale-125' : ''}`}>
-                <Face />
-              </span>
-              <span className={`text-sm font-black ${isSelected ? styles.number : 'text-muted-foreground'}`}>
-                {i}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+  const selectedCat = value !== null ? getCategory(value) : null;
+  const feedbackText = selectedCat ? CATEGORY_STYLES[selectedCat].tooltip : null;
+  const feedbackColor = selectedCat ? CATEGORY_STYLES[selectedCat].feedback : 'text-muted-foreground';
 
-      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest px-1">
-        <span className={CATEGORY_STYLES.detractor.label}>← Não recomendaria (0–6)</span>
-        <span className={CATEGORY_STYLES.passive.label}>Não fez diferença relevante (7–8)</span>
-        <span className={CATEGORY_STYLES.promoter.label}>Recomendaria com certeza (9–10) →</span>
+  return (
+    <TooltipProvider delayDuration={150}>
+      <div className="space-y-4 pt-2">
+        <div className="grid grid-cols-4 sm:flex sm:justify-between gap-2">
+          {[...Array(11)].map((_, i) => {
+            const cat = getCategory(i);
+            const styles = CATEGORY_STYLES[cat];
+            const isSelected = value === i;
+            const { Face } = styles;
+            return (
+              <Tooltip key={i}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => onChange(i)}
+                    className={`flex flex-col items-center gap-1 px-1 py-2 rounded-xl border font-bold transition-colors duration-150
+                      ${isSelected
+                        ? styles.selectedBg
+                        : `border-muted bg-background ${styles.hover}`
+                      }`}
+                  >
+                    <span className={`transition-transform duration-150 ${isSelected ? 'scale-110' : ''}`}>
+                      <Face />
+                    </span>
+                    <span className={`text-sm font-black ${isSelected ? styles.number : 'text-muted-foreground'}`}>
+                      {i}
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipPrimitive.Portal>
+                  <TooltipPrimitive.Content
+                    side="top"
+                    sideOffset={6}
+                    className={`z-50 rounded-md px-3 py-1.5 text-xs font-medium animate-in fade-in-0 zoom-in-95 ${styles.tooltipClass}`}
+                  >
+                    {styles.tooltip}
+                    <TooltipPrimitive.Arrow className={styles.tooltipArrow} />
+                  </TooltipPrimitive.Content>
+                </TooltipPrimitive.Portal>
+              </Tooltip>
+            );
+          })}
+        </div>
+
+        <p className={`text-center text-sm font-medium transition-colors duration-200 mt-4 ${feedbackColor}`}>
+          {feedbackText ?? 'Selecione uma nota de 0 a 10'}
+        </p>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle2, ChevronRight, ChevronLeft, Star } from 'lucide-react';
 import NpsScoreSelector from '@/components/NpsScoreSelector';
 import { toast } from 'sonner';
-import { Progress } from '@/components/ui/progress';
 
 export default function StudentNps() {
   const { id } = useParams();
@@ -99,8 +98,6 @@ export default function StudentNps() {
 
   const questions = survey.questions || [];
   const currentQuestion = questions[currentStep];
-  const progress = ((currentStep + 1) / questions.length) * 100;
-
   const renderQuestion = (q: any) => {
     const answer = answers[q.id];
 
@@ -179,10 +176,6 @@ export default function StudentNps() {
         </header>
 
         <Card className="border-none shadow-xl overflow-hidden ring-1 ring-black/5">
-          <div className="h-2 bg-muted">
-            <Progress value={progress} className="h-full rounded-none transition-all" />
-          </div>
-          
           <CardHeader className="px-8 pt-8">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-widest text-primary">

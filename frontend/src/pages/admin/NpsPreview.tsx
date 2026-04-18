@@ -176,13 +176,6 @@ export default function NpsPreview() {
         </header>
 
         <Card className="border-none shadow-xl overflow-hidden ring-1 ring-black/5">
-          <div className="h-2 bg-muted">
-            <div
-              className="h-full bg-primary transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
           <CardHeader className="px-8 pt-8 pb-0">
             <div className="flex items-center justify-between mb-2">
               <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest">

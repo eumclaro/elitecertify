@@ -95,9 +95,9 @@ export default function NpsScoreSelector({ value, onChange }: NpsScoreSelectorPr
       </div>
 
       <div className="flex justify-between text-[10px] font-black uppercase tracking-widest px-1">
-        <span className={CATEGORY_STYLES.detractor.label}>← Não recomendaria</span>
-        <span className={CATEGORY_STYLES.passive.label}>Não fez diferença relevante</span>
-        <span className={CATEGORY_STYLES.promoter.label}>Recomendaria com certeza →</span>
+        <span className={CATEGORY_STYLES.detractor.label}>← Não recomendaria (0–6)</span>
+        <span className={CATEGORY_STYLES.passive.label}>Não fez diferença relevante (7–8)</span>
+        <span className={CATEGORY_STYLES.promoter.label}>Recomendaria com certeza (9–10) →</span>
       </div>
     </div>
   );

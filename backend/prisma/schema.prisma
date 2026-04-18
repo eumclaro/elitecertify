@@ -279,12 +279,13 @@ model NpsInvite {
 model NpsResponse {
   id        String              @id @default(uuid())
   surveyId  String              @map("survey_id")
-  studentId String              @map("student_id")
+  studentId String?             @map("student_id")
   inviteId  String?             @unique @map("invite_id")
+  isTest    Boolean             @default(false) @map("is_test")
   createdAt DateTime            @default(now()) @map("created_at")
   details   NpsResponseDetail[]
   invite    NpsInvite?          @relation(fields: [inviteId], references: [id])
-  student   Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student   Student?            @relation(fields: [studentId], references: [id], onDelete: Cascade)
   survey    NpsSurvey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
 
   @@map("nps_responses")

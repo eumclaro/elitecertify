@@ -20,11 +20,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Plus, 
-  Trash2, 
+  Plus,
+  Trash2,
   Loader2,
   BarChart3,
   Send,
+  Eye,
   ArrowLeft,
   Users,
   MessageSquare,
@@ -211,6 +212,16 @@ export default function NpsSurveys() {
     );
   }
 
+  const deleteTestResponse = async (responseId: string, surveyId: string) => {
+    try {
+      await api.delete(`/nps/responses/${responseId}`);
+      toast.success('Resposta de teste excluída');
+      viewResults(surveyId);
+    } catch {
+      toast.error('Erro ao excluir resposta');
+    }
+  };
+
   const handleExport = async (surveyId: string, title: string) => {
     try {
       const response = await api.get(`/nps/surveys/${surveyId}/export`, { responseType: 'blob' });
@@ -381,19 +392,38 @@ export default function NpsSurveys() {
                 </Card>
               ) : filtered.map((r: any) => (
                 <Card key={r.id} className="border-none shadow-sm overflow-hidden">
-                  <CardHeader className="bg-muted/20 px-6 py-4 flex flex-row items-center justify-between">
+                  <CardHeader className={`px-6 py-4 flex flex-row items-center justify-between ${r.isTest ? 'bg-amber-500/10' : 'bg-muted/20'}`}>
                     <div className="flex items-center gap-3">
-                      <div className="size-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xs uppercase">
+                      <div className={`size-8 rounded-full flex items-center justify-center font-bold text-xs uppercase ${r.isTest ? 'bg-amber-500 text-white' : 'bg-primary text-primary-foreground'}`}>
                         {r.studentName.charAt(0)}
                       </div>
                       <div>
-                        <p className="font-bold text-sm leading-none">{r.studentName}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm leading-none">{r.studentName}</p>
+                          {r.isTest && (
+                            <Badge className="bg-amber-500/20 text-amber-700 border-amber-500/30 text-[10px] font-black uppercase tracking-widest px-2 py-0 shadow-none">
+                              Teste
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">{r.studentEmail}</p>
                       </div>
                     </div>
-                    <time className="text-[10px] text-muted-foreground font-medium uppercase">
-                      Respondido em: {new Date(r.createdAt).toLocaleString('pt-BR')}
-                    </time>
+                    <div className="flex items-center gap-3">
+                      <time className="text-[10px] text-muted-foreground font-medium uppercase">
+                        Respondido em: {new Date(r.createdAt).toLocaleString('pt-BR')}
+                      </time>
+                      {r.isTest && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-amber-600 hover:text-red-500 hover:bg-red-50"
+                          onClick={() => deleteTestResponse(r.id, s.survey.id)}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent className="p-6 space-y-6">
                     {s.questions.map((q: any, idx: number) => {
@@ -674,6 +704,9 @@ export default function NpsSurveys() {
                   <TableCell className="px-6 text-right flex justify-end gap-2 py-4">
                     <Button variant="ghost" size="sm" onClick={() => viewResults(s.id)} className="gap-1.5 font-bold uppercase tracking-wider text-[11px]">
                       <BarChart3 className="size-3" /> Resultados
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => window.open(`/admin/nps/${s.id}/preview`, '_blank')} className="gap-1.5 font-bold uppercase tracking-wider text-[11px]">
+                      <Eye className="size-3" /> Visualizar
                     </Button>
                     <Button size="sm" onClick={() => sendSurvey(s.id)} className="gap-1.5 font-bold uppercase tracking-wider text-[11px]">
                       <Send className="size-3" /> Enviar

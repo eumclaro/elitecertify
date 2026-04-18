@@ -143,6 +143,53 @@ router.delete('/surveys/:id', authMiddleware, requireRole('ADMIN'), checkPermiss
 });
 
 // ============================================================
+// PREVIEW — Admin visualizes survey as student would
+// ============================================================
+
+// GET /api/nps/surveys/:id/preview
+router.get('/surveys/:id/preview', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const survey = await prisma.npsSurvey.findUnique({
+      where: { id: req.params.id as string },
+      include: { questions: { orderBy: { order: 'asc' } } },
+    });
+    if (!survey) return res.status(404).json({ error: 'Pesquisa não encontrada' });
+    return res.json(survey);
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao carregar preview' });
+  }
+});
+
+// POST /api/nps/surveys/:id/preview — saves test response
+router.post('/surveys/:id/preview', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const { answers } = req.body;
+    const survey = await prisma.npsSurvey.findUnique({ where: { id: req.params.id as string } });
+    if (!survey) return res.status(404).json({ error: 'Pesquisa não encontrada' });
+
+    const response = await prisma.npsResponse.create({
+      data: {
+        surveyId: req.params.id as string,
+        studentId: null as any,
+        isTest: true,
+        details: {
+          create: answers.map((a: any) => ({
+            questionId: a.questionId,
+            score: a.score ?? null,
+            text: a.text ?? null,
+          })),
+        },
+      },
+      include: { details: true },
+    });
+    return res.json(response);
+  } catch (error) {
+    console.error('NPS preview submit error:', error);
+    return res.status(500).json({ error: 'Erro ao registrar resposta de teste' });
+  }
+});
+
+// ============================================================
 // INVITES — Send NPS to students
 // ============================================================
 
@@ -482,8 +529,9 @@ router.get('/surveys/:id/results', authMiddleware, requireRole('ADMIN'), async (
       studentsStatus,
       responses: (survey as any).responses.map((r: any) => ({
         id: r.id,
-        studentName: r.student.user.name,
-        studentEmail: r.student.user.email,
+        studentName: r.student?.user?.name ?? '(Preview Admin)',
+        studentEmail: r.student?.user?.email ?? '',
+        isTest: r.isTest,
         answers: r.details,
         createdAt: r.createdAt,
       })),
@@ -531,6 +579,23 @@ router.get('/surveys/:id/export', authMiddleware, requireRole('ADMIN'), async (r
     return res.send('\uFEFF' + csv); // BOM for Excel
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao exportar' });
+  }
+});
+
+// ============================================================
+// DELETE RESPONSE (test responses only)
+// ============================================================
+
+// DELETE /api/nps/responses/:id
+router.delete('/responses/:id', authMiddleware, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const response = await prisma.npsResponse.findUnique({ where: { id: req.params.id as string } });
+    if (!response) return res.status(404).json({ error: 'Resposta não encontrada' });
+
+    await prisma.npsResponse.delete({ where: { id: req.params.id as string } });
+    return res.json({ message: 'Resposta excluída' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao excluir resposta' });
   }
 });
 

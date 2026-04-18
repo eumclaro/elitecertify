@@ -13,6 +13,7 @@ import ExamQuestions from './pages/admin/ExamQuestions';
 import ExamReleases from './pages/admin/ExamReleases';
 import Classes from './pages/admin/Classes';
 import NpsSurveys from './pages/admin/NpsSurveys';
+import NpsPreview from './pages/admin/NpsPreview';
 import Reports from './pages/admin/Reports';
 import AuditLogs from './pages/admin/AuditLogs';
 import SmtpSettings from './pages/admin/SmtpSettings';
@@ -55,6 +56,7 @@ function AppRoutes() {
       <Route path="/admin/exams/:examId/questions" element={<ProtectedRoute><Layout><ExamQuestions /></Layout></ProtectedRoute>} />
       <Route path="/admin/exams/:examId/releases" element={<ProtectedRoute><Layout><ExamReleases /></Layout></ProtectedRoute>} />
       <Route path="/admin/nps" element={<ProtectedRoute><Layout><NpsSurveys /></Layout></ProtectedRoute>} />
+      <Route path="/admin/nps/:id/preview" element={<ProtectedRoute><NpsPreview /></ProtectedRoute>} />
       <Route path="/admin/reports" element={<ProtectedRoute><Layout><Reports /></Layout></ProtectedRoute>} />
       <Route path="/admin/audit" element={<ProtectedRoute requiredPermission="canManageAdmins"><Layout><AuditLogs /></Layout></ProtectedRoute>} />
       <Route path="/admin/smtp" element={<ProtectedRoute requiredPermission="canManageSettings"><Layout><SmtpSettings /></Layout></ProtectedRoute>} />
